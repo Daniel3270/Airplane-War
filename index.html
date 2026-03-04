@@ -182,7 +182,7 @@
             align-items: center;
             justify-content: center;
             text-align: center;
-            background: linear-gradient(160deg, rgba(5, 9, 22, 0.9), rgba(8, 17, 36, 0.78));
+            background: linear-gradient(160deg, rgba(5, 9, 22, 0.94), rgba(8, 17, 36, 0.9));
             padding: 24px;
         }
 
@@ -219,6 +219,48 @@
             margin-top: 12px;
             flex-wrap: wrap;
             justify-content: center;
+        }
+
+        .start-card {
+            width: min(100%, 372px);
+            border: 1px solid rgba(148, 208, 255, 0.26);
+            border-radius: 16px;
+            background: rgba(8, 20, 40, 0.56);
+            box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(4px);
+            padding: 16px 14px 14px;
+        }
+
+        .start-kicker {
+            margin-bottom: 6px;
+            color: #86c8f6;
+            font-size: 11px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            opacity: 0.92;
+        }
+
+        .start-subtitle {
+            margin-top: 3px;
+            margin-bottom: 10px;
+        }
+
+        .start-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 2px;
+        }
+
+        .start-tags span {
+            border: 1px solid rgba(140, 198, 242, 0.34);
+            background: rgba(16, 35, 60, 0.62);
+            border-radius: 999px;
+            padding: 4px 8px;
+            color: #bfdcf4;
+            font-size: 12px;
+            line-height: 1.2;
         }
 
         .profile-panel {
@@ -327,6 +369,17 @@
             box-shadow: none;
         }
 
+        button.ghost {
+            border: 1px solid rgba(152, 210, 255, 0.52);
+            border-radius: 12px;
+            padding: 11px 16px;
+            color: #cce7ff;
+            background: rgba(17, 36, 60, 0.8);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
         #loading {
             position: absolute;
             left: 50%;
@@ -406,6 +459,16 @@
                 font-size: 14px;
             }
 
+            .start-card {
+                border-radius: 14px;
+                padding: 14px 10px 12px;
+            }
+
+            .start-tags span {
+                font-size: 11px;
+                padding: 4px 7px;
+            }
+
             .profile-panel {
                 width: min(100%, 340px);
                 padding: 8px;
@@ -439,6 +502,12 @@
             #profile-open {
                 padding: 3px 5px;
                 font-size: 9px;
+            }
+
+            button.ghost,
+            button.primary {
+                font-size: 13px;
+                padding: 10px 14px;
             }
         }
     </style>
@@ -487,14 +556,22 @@
         <div id="pause-pill">已暂停（P / ESC 继续）</div>
 
         <section id="start-overlay" class="overlay">
-            <h1>飞机大战 · Enhanced</h1>
-            <p>升级版太空射击：更多敌机、道具与武器形态，节奏更爽快。</p>
-            <p>键盘：方向键 / WASD 移动，P 或 ESC 暂停，R 重开，B 炸弹，M 静音，F 全屏，H 显隐 HUD。</p>
-            <div class="actions">
-                <button id="start-btn" class="primary" disabled>加载素材中...</button>
+            <div class="start-card">
+                <p class="start-kicker">Arcade Shooter</p>
+                <h1>飞机大战 · Enhanced</h1>
+                <p class="start-subtitle">快节奏太空射击，随机道具 + 精英敌机。</p>
+                <div class="start-tags" aria-label="快速玩法提示">
+                    <span>拖动移动</span>
+                    <span>自动射击</span>
+                    <span>B 炸弹</span>
+                    <span>P 暂停</span>
+                </div>
+                <div class="actions">
+                    <button id="start-btn" class="primary" disabled>加载素材中...</button>
+                    <button id="open-profile-start" class="ghost" type="button">用户与排行</button>
+                </div>
+                <p class="hint">注册/切换用户名：点「用户与排行」</p>
             </div>
-            <p class="hint">注册/切换用户：点击右下角「用户」按钮。</p>
-            <p class="hint">鼠标/触控：按住并拖动飞机。游戏自动射击。</p>
         </section>
 
         <section id="gameover-overlay" class="overlay hidden">

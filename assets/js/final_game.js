@@ -107,6 +107,7 @@
     const leaderboardListEl = document.getElementById("leaderboard-list");
     const profileOpenBtn = document.getElementById("profile-open");
     const profileDockEl = document.getElementById("profile-dock");
+    const openProfileStartBtn = document.getElementById("open-profile-start");
 
     const images = Object.create(null);
     const sounds = Object.create(null);
@@ -442,6 +443,9 @@
         } else {
             profileDockEl.classList.remove("visible");
         }
+        if (openProfileStartBtn) {
+            openProfileStartBtn.textContent = visible ? "收起用户面板" : "用户与排行";
+        }
     }
 
     function setBgmVolume() {
@@ -548,7 +552,7 @@
             state.ready = true;
             loadingEl.style.display = "none";
             startBtn.disabled = false;
-            startBtn.textContent = "Start Game";
+            startBtn.textContent = "开始游戏";
             updateHud();
             updateAudioButton();
             updatePauseButton();
@@ -620,7 +624,7 @@
         finalBestEl.textContent = String(state.bestScore);
         updateHud();
         updatePauseButton();
-        setProfileDockVisible(true);
+        setProfileDockVisible(false);
         gameoverOverlay.classList.remove("hidden");
     }
 
@@ -2171,6 +2175,18 @@
         });
     }
 
+    if (openProfileStartBtn) {
+        openProfileStartBtn.addEventListener("click", () => {
+            if (state.running && !state.paused) return;
+            const opening = !(profileDockEl && profileDockEl.classList.contains("visible"));
+            setProfileDockVisible(opening);
+            if (opening) {
+                updateProfilePanel();
+                updateLeaderboardPanel();
+            }
+        });
+    }
+
     if (audioToggleBtn) {
         audioToggleBtn.addEventListener("click", () => {
             toggleMute();
@@ -2188,7 +2204,7 @@
     updateHud();
     updateAudioButton();
     updatePauseButton();
-    setProfileDockVisible(true);
+    setProfileDockVisible(false);
 
     loadAssets().catch(() => {
         loadingEl.textContent = "素材加载失败，请刷新重试";
