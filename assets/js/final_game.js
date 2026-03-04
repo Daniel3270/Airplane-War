@@ -12,6 +12,11 @@
         spawnBase: 0.92,
         spawnMin: 0.25,
         spawnRampPerSecond: 0.008,
+        pickupBaseInterval: 9.2,
+        pickupMinInterval: 5.0,
+        pickupRampPerSecond: 0.01,
+        weaponDuration: 12,
+        laserTick: 0.09,
         hitInvincibleSeconds: 1.15,
         storageKey: "plane-war-remaster-best-score",
         bgmVolume: 0.35,
@@ -26,10 +31,15 @@
         enemyScout1: "assets/images/enemy-scout-1.png",
         enemyScout2: "assets/images/enemy-scout-2.png",
         enemyElite: "assets/images/enemy-elite.png",
+        enemyAce: "assets/images/enemy-ace.png",
+        enemyDestroyer: "assets/images/enemy-destroyer.png",
         meteor1: "assets/images/meteor-1.png",
         meteor2: "assets/images/meteor-2.png",
         bullet: "assets/images/bullet.png",
         enemyBullet: "assets/images/enemy-bullet.png",
+        missilePlayer: "assets/images/missile-player.png",
+        missileEnemy: "assets/images/missile-enemy.png",
+        pickupLaser: "assets/images/pickup-laser.png",
         backgroundTile: "assets/images/background-tile.png",
         life: "assets/images/life.png",
         explosion1: "assets/images/explosion-1.png",
@@ -72,6 +82,8 @@
     const comboEl = document.getElementById("combo");
     const livesEl = document.getElementById("lives");
     const bestEl = document.getElementById("best");
+    const weaponEl = document.getElementById("weapon");
+    const weaponTimerEl = document.getElementById("weapon-timer");
 
     const startOverlay = document.getElementById("start-overlay");
     const gameoverOverlay = document.getElementById("gameover-overlay");
@@ -101,16 +113,21 @@
         elapsed: 0,
         bgOffset: 0,
         spawnTimer: 0,
+        pickupTimer: 0,
         fireTimer: 0,
+        weaponTickTimer: 0,
         bombCooldown: 0,
         score: 0,
         combo: 0,
         lives: CONFIG.maxLives,
+        weaponMode: "normal",
+        weaponTimer: 0,
         bestScore: loadBestScore(),
         stars: createStars(95),
         bullets: [],
         enemyBullets: [],
         enemies: [],
+        pickups: [],
         particles: [],
         explosions: [],
         keys: Object.create(null),
@@ -303,14 +320,19 @@
         state.elapsed = 0;
         state.bgOffset = 0;
         state.spawnTimer = 0;
+        state.pickupTimer = 0;
         state.fireTimer = 0;
+        state.weaponTickTimer = 0;
         state.bombCooldown = 0;
         state.score = 0;
         state.combo = 0;
         state.lives = CONFIG.maxLives;
+        state.weaponMode = "normal";
+        state.weaponTimer = 0;
         state.bullets = [];
         state.enemyBullets = [];
         state.enemies = [];
+        state.pickups = [];
         state.particles = [];
         state.explosions = [];
         state.pointer.down = false;
@@ -337,6 +359,9 @@
     function endGame() {
         state.running = false;
         state.paused = false;
+        state.weaponMode = "normal";
+        state.weaponTimer = 0;
+        state.pickups = [];
         pausePill.style.display = "none";
         stopBgm();
 
@@ -375,11 +400,14 @@
 
         updateStars(dt);
         updatePlayer(dt);
+        updateWeaponMode(dt);
         autoShoot(dt);
         spawnEnemies(dt);
+        spawnPickups(dt);
         updateBullets(dt);
         updateEnemyBullets(dt);
         updateEnemies(dt);
+        updatePickups(dt);
         detectCollisions();
         updateExplosions(dt);
         updateParticles(dt);
@@ -431,6 +459,137 @@
         player.spread = Math.min(5, 1 + Math.floor(state.score / 1000));
     }
 
+    function updateWeaponMode(dt) {
+        if (state.weaponMode === "normal") {
+            return;
+        }
+
+        state.weaponTimer = Math.max(0, state.weaponTimer - dt);
+        if (state.weaponMode === "laser") {
+            state.weaponTickTimer -= dt;
+            if (state.weaponTickTimer <= 0) {
+                state.weaponTickTimer += CONFIG.laserTick;
+                applyLaserDamage();
+            }
+        }
+
+        if (state.weaponTimer <= 0) {
+            state.weaponMode = "normal";
+            state.weaponTimer = 0;
+            state.weaponTickTimer = 0;
+        }
+    }
+
+    function setWeaponMode(mode, duration) {
+        if (!["laser", "missile"].includes(mode)) {
+            state.weaponMode = "normal";
+            state.weaponTimer = 0;
+            state.weaponTickTimer = 0;
+            return;
+        }
+
+        if (state.weaponMode === mode) {
+            state.weaponTimer = Math.min(CONFIG.weaponDuration + 8, state.weaponTimer + duration * 0.6);
+        } else {
+            state.weaponMode = mode;
+            state.weaponTimer = duration;
+        }
+
+        if (mode === "laser") {
+            state.weaponTickTimer = 0;
+        }
+    }
+
+    function applyLaserDamage() {
+        if (!state.running || state.paused) return;
+
+        const beamHalfWidth = 28;
+        let touched = false;
+        for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
+            const enemy = state.enemies[i];
+            if (enemy.y > state.player.y + 8) continue;
+
+            const hitWidth = beamHalfWidth + enemy.w * (enemy.type === "meteor" ? 0.28 : 0.4);
+            if (Math.abs(enemy.x - state.player.x) > hitWidth) continue;
+
+            const damage = enemy.kind === "destroyer" ? 1.15 : 1.9;
+            enemy.hp -= damage;
+            touched = true;
+            if (enemy.hp <= 0) {
+                destroyEnemy(i);
+            }
+        }
+
+        if (touched && Math.random() < 0.3) {
+            playSfx("hit", 0.12, randomRange(1.05, 1.2));
+        }
+    }
+
+    function spawnPickups(dt) {
+        if (!state.running || state.paused) return;
+        if (state.pickups.length >= 2) return;
+
+        state.pickupTimer += dt;
+        const interval = Math.max(
+            CONFIG.pickupMinInterval,
+            CONFIG.pickupBaseInterval - state.elapsed * CONFIG.pickupRampPerSecond
+        );
+
+        if (state.pickupTimer < interval) return;
+        state.pickupTimer = randomRange(-0.8, 0.8);
+
+        const roll = Math.random();
+        if (roll < 0.34) {
+            spawnPickupItem("bomb");
+        } else if (roll < 0.67) {
+            spawnPickupItem("laser");
+        } else {
+            spawnPickupItem("missile");
+        }
+    }
+
+    function spawnPickupItem(type) {
+        state.pickups.push({
+            type,
+            x: randomRange(34, CONFIG.width - 34),
+            y: -24,
+            w: 30,
+            h: 30,
+            vy: randomRange(78, 125) + state.elapsed * 0.35,
+            phase: Math.random() * Math.PI * 2,
+            life: 15
+        });
+    }
+
+    function updatePickups(dt) {
+        for (let i = state.pickups.length - 1; i >= 0; i -= 1) {
+            const p = state.pickups[i];
+            p.y += p.vy * dt;
+            p.x += Math.sin((state.elapsed + p.phase) * 2.4) * 24 * dt;
+            p.life -= dt;
+
+            if (p.life <= 0 || p.y - p.h / 2 > CONFIG.height + 16) {
+                state.pickups.splice(i, 1);
+            }
+        }
+    }
+
+    function applyPickup(type, x, y) {
+        if (type === "bomb") {
+            detonateSmartBomb();
+            burst(x, y, 24, ["#ffe9c0", "#ffd67e", "#ff8e54"]);
+        } else if (type === "laser") {
+            setWeaponMode("laser", CONFIG.weaponDuration);
+            burst(x, y, 18, ["#d8f6ff", "#87e3ff", "#43c2ff"]);
+        } else if (type === "missile") {
+            setWeaponMode("missile", CONFIG.weaponDuration);
+            burst(x, y, 18, ["#f8e8ff", "#9dd6ff", "#5ca8ff"]);
+        }
+
+        addShake(0.25, 0.15);
+        playSfx("start", 0.36, randomRange(1.03, 1.16));
+    }
+
     function updateExplosions(dt) {
         for (let i = state.explosions.length - 1; i >= 0; i -= 1) {
             const e = state.explosions[i];
@@ -464,8 +623,42 @@
         state.fireTimer -= dt;
         if (state.fireTimer > 0) return;
 
-        const spread = state.player.spread;
         const fireRatio = state.keys.Space ? 0.74 : 1;
+        const originY = state.player.y - state.player.h * 0.44;
+
+        if (state.weaponMode === "laser") {
+            state.fireTimer = 0.06 * fireRatio;
+            if (Math.random() < 0.35) {
+                playSfx("shoot", 0.08, randomRange(1.15, 1.35));
+            }
+            return;
+        }
+
+        if (state.weaponMode === "missile") {
+            state.fireTimer = 0.28 * fireRatio;
+            const offsets = state.keys.Space ? [-12, 12] : [0];
+            for (const offset of offsets) {
+                state.bullets.push({
+                    kind: "missile",
+                    x: state.player.x + offset,
+                    y: originY,
+                    w: 14,
+                    h: 30,
+                    vx: offset * 2.6,
+                    vy: -420,
+                    speed: 560,
+                    turnRate: 8.5,
+                    damage: 2.4,
+                    rotation: 0,
+                    trailTimer: 0
+                });
+            }
+
+            playSfx("shoot", 0.2, randomRange(0.9, 1.02));
+            return;
+        }
+
+        const spread = state.player.spread;
         state.fireTimer = (CONFIG.baseFireCooldown * fireRatio) / (1 + (spread - 1) * 0.13);
 
         const angleMap = {
@@ -477,10 +670,9 @@
         };
 
         const angles = angleMap[spread] || angleMap[1];
-        const originY = state.player.y - state.player.h * 0.44;
-
         for (const angle of angles) {
             state.bullets.push({
+                kind: "normal",
                 x: state.player.x,
                 y: originY,
                 w: 12,
@@ -499,7 +691,7 @@
 
         const interval = Math.max(
             CONFIG.spawnMin,
-            CONFIG.spawnBase - state.elapsed * CONFIG.spawnRampPerSecond
+            CONFIG.spawnBase - state.elapsed * CONFIG.spawnRampPerSecond - Math.min(0.24, state.score * 0.00002)
         );
 
         if (state.spawnTimer < interval) return;
@@ -512,7 +704,7 @@
         }
 
         spawnEnemyFromLibrary();
-        if (Math.random() < Math.min(0.25, state.elapsed * 0.004)) {
+        if (Math.random() < Math.min(0.4, state.elapsed * 0.004 + state.score * 0.000008)) {
             spawnEnemyFromLibrary();
         }
     }
@@ -598,7 +790,50 @@
                 drift: 42,
                 shootChance: 0.6,
                 fireMin: 0.7,
-                fireMax: 1.25
+                fireMax: 1.25,
+                kind: "elite"
+            };
+        }
+
+        const aceChance = state.elapsed > 26 ? Math.min(0.22, 0.08 + state.elapsed * 0.0013) : 0;
+        const destroyerChance = state.elapsed > 58 ? Math.min(0.12, 0.02 + state.elapsed * 0.0008) : 0;
+        const eliteRoll = Math.random();
+
+        if (eliteRoll < destroyerChance) {
+            template = {
+                image: "enemyDestroyer",
+                hp: 14,
+                score: 980,
+                speedMin: 92,
+                speedMax: 142,
+                scale: 0.52,
+                drift: 74,
+                shootChance: 0.92,
+                fireMin: 0.48,
+                fireMax: 0.86,
+                kind: "destroyer",
+                shotMode: "fan",
+                burstCount: 5,
+                burstSpread: 0.42,
+                contactDamage: 2
+            };
+        } else if (eliteRoll < destroyerChance + aceChance) {
+            template = {
+                image: "enemyAce",
+                hp: 8,
+                score: 620,
+                speedMin: 122,
+                speedMax: 188,
+                scale: 0.74,
+                drift: 118,
+                shootChance: 0.78,
+                fireMin: 0.58,
+                fireMax: 1.0,
+                kind: "ace",
+                shotMode: "burst",
+                burstCount: 3,
+                burstSpread: 0.28,
+                contactDamage: 2
             };
         }
 
@@ -618,14 +853,22 @@
             h,
             hp: template.hp,
             maxHp: template.hp,
+            kind: template.kind || "enemy",
             score: template.score,
             vy: randomRange(template.speedMin, template.speedMax) * diff,
             drift: template.drift,
             phase: Math.random() * Math.PI * 2,
-            shootChance: Math.min(0.82, template.shootChance + state.elapsed * 0.002),
+            shootChance: Math.min(
+                template.kind === "destroyer" ? 0.96 : 0.88,
+                template.shootChance + state.elapsed * 0.002
+            ),
             fireMin: Math.max(0.55, template.fireMin - state.elapsed * 0.0015),
             fireMax: Math.max(0.85, template.fireMax - state.elapsed * 0.0017),
-            shootCooldown: randomRange(template.fireMin, template.fireMax)
+            shootCooldown: randomRange(template.fireMin, template.fireMax),
+            shotMode: template.shotMode || "single",
+            burstCount: template.burstCount || 0,
+            burstSpread: template.burstSpread || 0,
+            contactDamage: template.contactDamage || 1
         });
     }
 
@@ -663,6 +906,36 @@
     function updateBullets(dt) {
         for (let i = state.bullets.length - 1; i >= 0; i -= 1) {
             const bullet = state.bullets[i];
+            if (bullet.kind === "missile") {
+                const target = findClosestEnemy(bullet.x, bullet.y);
+                if (target) {
+                    const dx = target.x - bullet.x;
+                    const dy = target.y - bullet.y;
+                    const len = Math.hypot(dx, dy) || 1;
+                    const desiredVx = (dx / len) * bullet.speed;
+                    const desiredVy = (dy / len) * bullet.speed;
+                    const steer = Math.min(1, bullet.turnRate * dt);
+                    bullet.vx += (desiredVx - bullet.vx) * steer;
+                    bullet.vy += (desiredVy - bullet.vy) * steer;
+                }
+
+                bullet.rotation = Math.atan2(bullet.vy, bullet.vx) + Math.PI / 2;
+                bullet.trailTimer -= dt;
+                if (bullet.trailTimer <= 0) {
+                    bullet.trailTimer = 0.04;
+                    state.particles.push({
+                        x: bullet.x,
+                        y: bullet.y + bullet.h * 0.36,
+                        vx: randomRange(-12, 12),
+                        vy: randomRange(24, 76),
+                        life: randomRange(0.14, 0.24),
+                        maxLife: 0.24,
+                        size: randomRange(1.4, 2.6),
+                        color: "#ffd9a1"
+                    });
+                }
+            }
+
             bullet.x += bullet.vx * dt;
             bullet.y += bullet.vy * dt;
 
@@ -675,6 +948,22 @@
                 state.bullets.splice(i, 1);
             }
         }
+    }
+
+    function findClosestEnemy(x, y) {
+        let best = null;
+        let bestDist = Infinity;
+        for (const enemy of state.enemies) {
+            const dy = enemy.y - y;
+            if (dy > 210) continue;
+            const dx = enemy.x - x;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < bestDist) {
+                bestDist = d2;
+                best = enemy;
+            }
+        }
+        return best;
     }
 
     function updateEnemyBullets(dt) {
@@ -709,7 +998,13 @@
 
                 if (enemy.shootCooldown <= 0) {
                     if (Math.random() < enemy.shootChance) {
-                        fireEnemyBullet(enemy);
+                        if (enemy.shotMode === "burst") {
+                            fireEnemySpread(enemy, enemy.burstCount || 3, enemy.burstSpread || 0.26, 1.05);
+                        } else if (enemy.shotMode === "fan") {
+                            fireEnemySpread(enemy, enemy.burstCount || 5, enemy.burstSpread || 0.42, 1.12);
+                        } else {
+                            fireEnemyBullet(enemy);
+                        }
                     }
                     enemy.shootCooldown = randomRange(enemy.fireMin, enemy.fireMax);
                 }
@@ -720,7 +1015,7 @@
 
             if (enemy.y - enemy.h / 2 > CONFIG.height + 8) {
                 state.enemies.splice(i, 1);
-                onPlayerHit();
+                onPlayerHit(enemy.contactDamage || 1);
             }
         }
     }
@@ -734,19 +1029,50 @@
         const speed = CONFIG.enemyBulletSpeed * randomRange(0.92, 1.13);
         const vx = (dx / len) * speed * 0.5;
         const vy = Math.max(165, (dy / len) * speed);
+        const eliteShot = enemy.kind === "ace" || enemy.kind === "destroyer" || enemy.kind === "elite";
 
         state.enemyBullets.push({
             x: enemy.x,
             y: enemy.y + enemy.h * 0.35,
-            w: 13,
-            h: 26,
+            w: eliteShot ? 14 : 13,
+            h: eliteShot ? 30 : 26,
             vx,
             vy,
             damage: 1,
-            rotation: Math.atan2(vy, vx) + Math.PI / 2
+            rotation: Math.atan2(vy, vx) + Math.PI / 2,
+            skin: eliteShot ? "missile" : "default"
         });
 
         playSfx("enemyShoot", 0.2, randomRange(0.96, 1.04));
+    }
+
+    function fireEnemySpread(enemy, count, spread, speedScale) {
+        const shots = Math.max(2, count | 0);
+        const center = (shots - 1) / 2;
+        const aim = Math.atan2(state.player.y - enemy.y, state.player.x - enemy.x);
+        const bulletSpeed = CONFIG.enemyBulletSpeed * (speedScale || 1);
+
+        for (let i = 0; i < shots; i += 1) {
+            const offsetRatio = center === 0 ? 0 : (i - center) / center;
+            const angle = aim + offsetRatio * spread;
+            const speed = bulletSpeed * randomRange(0.9, 1.08);
+            const vx = Math.cos(angle) * speed * 0.55;
+            const vy = Math.max(170, Math.sin(angle) * speed);
+
+            state.enemyBullets.push({
+                x: enemy.x,
+                y: enemy.y + enemy.h * 0.35,
+                w: 14,
+                h: 30,
+                vx,
+                vy,
+                damage: enemy.kind === "destroyer" ? 2 : 1,
+                rotation: Math.atan2(vy, vx) + Math.PI / 2,
+                skin: "missile"
+            });
+        }
+
+        playSfx("enemyShoot", 0.25, randomRange(0.9, 1.02));
     }
 
     function updateParticles(dt) {
@@ -776,11 +1102,14 @@
                 }
 
                 state.bullets.splice(i, 1);
-                enemy.hp -= bullet.damage;
-                playSfx("hit", 0.16, randomRange(0.95, 1.06));
-
-                if (enemy.hp <= 0) {
-                    destroyEnemy(j);
+                if (bullet.kind === "missile") {
+                    explodeMissile(bullet.x, bullet.y, bullet.damage || 2.2);
+                } else {
+                    enemy.hp -= bullet.damage;
+                    playSfx("hit", 0.16, randomRange(0.95, 1.06));
+                    if (enemy.hp <= 0) {
+                        destroyEnemy(j);
+                    }
                 }
                 break;
             }
@@ -808,10 +1137,58 @@
                 state.enemies.splice(i, 1);
                 spawnExplosion(enemy.x, enemy.y, 1);
                 burst(enemy.x, enemy.y, 14, ["#ffd7c0", "#ff8e72", "#ff564f"]);
-                onPlayerHit(enemy.type === "meteor" ? 2 : 1);
+                const hitDamage = enemy.type === "meteor" ? 2 : (enemy.contactDamage || 1);
+                onPlayerHit(hitDamage);
                 break;
             }
         }
+
+        for (let i = state.pickups.length - 1; i >= 0; i -= 1) {
+            const pickup = state.pickups[i];
+            if (!intersects(state.player, pickup, 0.78)) {
+                continue;
+            }
+            state.pickups.splice(i, 1);
+            applyPickup(pickup.type, pickup.x, pickup.y);
+        }
+    }
+
+    function explodeMissile(x, y, baseDamage) {
+        const radius = 88;
+        spawnExplosion(x, y, 1.1);
+        burst(x, y, 20, ["#ffe7cb", "#ffb36e", "#ff6f48"]);
+        addShake(0.22, 0.2);
+        playSfx("explosion", 0.35, randomRange(1.05, 1.16));
+
+        for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
+            const enemy = state.enemies[i];
+            const dist = Math.hypot(enemy.x - x, enemy.y - y);
+            if (dist > radius) continue;
+
+            const ratio = 1 - dist / radius;
+            const damage = Math.max(0.8, (baseDamage || 2.2) * ratio + 0.7);
+            enemy.hp -= damage;
+            if (enemy.hp <= 0) {
+                destroyEnemy(i);
+            }
+        }
+    }
+
+    function detonateSmartBomb() {
+        const hasTargets = state.enemies.length > 0 || state.enemyBullets.length > 0;
+        if (!hasTargets) {
+            return false;
+        }
+
+        state.enemyBullets.length = 0;
+        while (state.enemies.length > 0) {
+            destroyEnemy(state.enemies.length - 1);
+        }
+
+        addShake(0.5, 0.24);
+        burst(state.player.x, state.player.y, 26, ["#89f1ff", "#d7fdff", "#ffffff"]);
+        playSfx("explosion", 0.52, 0.84);
+        return true;
     }
 
     function destroyEnemy(index) {
@@ -893,7 +1270,9 @@
         drawBackground();
         drawStars();
         drawEnemies();
+        drawPickups();
         drawBullets();
+        drawLaserBeam();
         drawEnemyBullets();
         drawPlayer();
         drawExplosions();
@@ -994,27 +1373,94 @@
         ctx.restore();
     }
 
+    function drawPickups() {
+        for (const pickup of state.pickups) {
+            const icon = pickup.type === "laser"
+                ? "pickupLaser"
+                : pickup.type === "missile"
+                    ? "missileEnemy"
+                    : "life";
+
+            const pulse = 0.9 + Math.sin(state.elapsed * 5 + pickup.phase) * 0.12;
+            ctx.save();
+            ctx.translate(pickup.x, pickup.y);
+            ctx.rotate(Math.sin(state.elapsed * 2 + pickup.phase) * 0.22);
+
+            if (imageUsable(icon)) {
+                const img = images[icon];
+                const size = Math.max(24, Math.min(40, (pickup.w + pickup.h) * 0.58)) * pulse;
+                ctx.drawImage(img, -size / 2, -size / 2, size, size);
+            } else {
+                ctx.fillStyle = pickup.type === "bomb" ? "#ffd16a" : pickup.type === "laser" ? "#78dcff" : "#9cc8ff";
+                ctx.beginPath();
+                ctx.arc(0, 0, pickup.w * 0.45 * pulse, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+    }
+
     function drawBullets() {
         for (const bullet of state.bullets) {
-            if (imageUsable("bullet")) {
-                const img = images.bullet;
-                const angle = Math.atan2(bullet.vy, bullet.vx) + Math.PI / 2;
+            const isMissile = bullet.kind === "missile";
+            const key = isMissile ? "missilePlayer" : "bullet";
+            if (imageUsable(key)) {
+                const img = images[key];
+                const angle = isMissile ? (bullet.rotation || 0) : Math.atan2(bullet.vy, bullet.vx) + Math.PI / 2;
                 ctx.save();
                 ctx.translate(bullet.x, bullet.y);
                 ctx.rotate(angle);
                 ctx.drawImage(img, -bullet.w / 2, -bullet.h / 2, bullet.w, bullet.h);
                 ctx.restore();
             } else {
-                ctx.fillStyle = "#6ad8ff";
+                ctx.fillStyle = isMissile ? "#b9f589" : "#6ad8ff";
                 ctx.fillRect(bullet.x - bullet.w / 2, bullet.y - bullet.h / 2, bullet.w, bullet.h);
             }
         }
     }
 
+    function drawLaserBeam() {
+        if (state.weaponMode !== "laser" || !state.running || state.paused) {
+            return;
+        }
+
+        const x = state.player.x;
+        const y0 = state.player.y - state.player.h * 0.55;
+        const y1 = 0;
+        const wave = Math.sin(state.elapsed * 36) * 2;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        const glow = ctx.createLinearGradient(0, y0, 0, y1);
+        glow.addColorStop(0, "rgba(144, 238, 255, 0.06)");
+        glow.addColorStop(0.45, "rgba(102, 229, 255, 0.2)");
+        glow.addColorStop(1, "rgba(132, 248, 255, 0.06)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - 26, y1, 52, y0 - y1);
+
+        ctx.strokeStyle = "rgba(98, 230, 255, 0.35)";
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.moveTo(x + wave, y0);
+        ctx.lineTo(x - wave, y1);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(220, 251, 255, 0.95)";
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.moveTo(x, y0);
+        ctx.lineTo(x, y1);
+        ctx.stroke();
+        ctx.restore();
+    }
+
     function drawEnemyBullets() {
         for (const bullet of state.enemyBullets) {
-            if (imageUsable("enemyBullet")) {
-                const img = images.enemyBullet;
+            const key = bullet.skin === "missile" ? "missileEnemy" : "enemyBullet";
+            if (imageUsable(key)) {
+                const img = images[key];
                 ctx.save();
                 ctx.translate(bullet.x, bullet.y);
                 ctx.rotate(bullet.rotation);
@@ -1040,7 +1486,13 @@
                 const hpRatio = enemy.hp / enemy.maxHp;
                 ctx.fillStyle = "rgba(8, 18, 34, 0.8)";
                 ctx.fillRect(enemy.x - width / 2, enemy.y + enemy.h / 2 + 4, width, 4);
-                ctx.fillStyle = enemy.type === "meteor" ? "#eec68f" : "#8af0c7";
+                ctx.fillStyle = enemy.kind === "destroyer"
+                    ? "#ff9ca0"
+                    : enemy.kind === "ace"
+                        ? "#ffd58a"
+                        : enemy.type === "meteor"
+                            ? "#eec68f"
+                            : "#8af0c7";
                 ctx.fillRect(enemy.x - width / 2, enemy.y + enemy.h / 2 + 4, width * hpRatio, 4);
             }
         }
@@ -1115,6 +1567,25 @@
         comboEl.textContent = String(state.combo);
         livesEl.textContent = String(Math.max(0, state.lives));
         bestEl.textContent = `Best ${state.bestScore}`;
+
+        if (weaponEl) {
+            const labelMap = {
+                normal: "NORMAL",
+                laser: "LASER",
+                missile: "MISSILE"
+            };
+            weaponEl.textContent = `Weapon ${labelMap[state.weaponMode] || "NORMAL"}`;
+        }
+
+        if (weaponTimerEl) {
+            if (state.weaponMode === "normal") {
+                weaponTimerEl.textContent = state.bombCooldown > 0
+                    ? `Bomb CD ${state.bombCooldown.toFixed(1)}s`
+                    : "Bomb Ready";
+            } else {
+                weaponTimerEl.textContent = `Mode ${state.weaponTimer.toFixed(1)}s`;
+            }
+        }
     }
 
     function intersects(a, b, shrink) {
@@ -1152,20 +1623,8 @@
     function triggerBomb() {
         if (!state.running || state.paused) return;
         if (state.bombCooldown > 0) return;
-
-        const hasTargets = state.enemies.length > 0 || state.enemyBullets.length > 0;
-        if (!hasTargets) return;
-
+        if (!detonateSmartBomb()) return;
         state.bombCooldown = 8;
-        state.enemyBullets.length = 0;
-
-        while (state.enemies.length > 0) {
-            destroyEnemy(state.enemies.length - 1);
-        }
-
-        addShake(0.5, 0.24);
-        burst(state.player.x, state.player.y, 26, ["#89f1ff", "#d7fdff", "#ffffff"]);
-        playSfx("explosion", 0.52, 0.84);
     }
 
     function toggleHud() {

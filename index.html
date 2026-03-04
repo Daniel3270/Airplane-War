@@ -64,12 +64,12 @@
 
         #hud {
             position: absolute;
-            top: 12px;
-            left: 12px;
-            right: 12px;
+            top: 8px;
+            left: 8px;
+            right: 8px;
             display: flex;
             justify-content: space-between;
-            gap: 10px;
+            gap: 6px;
             z-index: 20;
             pointer-events: none;
         }
@@ -78,9 +78,9 @@
             background: var(--panel);
             border: 1px solid var(--line);
             border-radius: 12px;
-            padding: 10px 12px;
+            padding: 8px 10px;
             backdrop-filter: blur(6px);
-            min-width: 138px;
+            min-width: 124px;
         }
 
         .hud-label {
@@ -92,21 +92,22 @@
 
         .hud-value {
             margin-top: 2px;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 700;
             line-height: 1;
         }
 
         .hud-small {
-            margin-top: 6px;
-            font-size: 13px;
+            margin-top: 5px;
+            font-size: 12px;
             color: var(--text-weak);
         }
 
         #audio-toggle,
         #pause-toggle {
-            margin-top: 8px;
-            width: 100%;
+            margin-top: 0;
+            width: auto;
+            flex: 1 1 0;
             border: 1px solid rgba(160, 212, 255, 0.7);
             border-radius: 8px;
             padding: 6px 8px;
@@ -117,8 +118,11 @@
             pointer-events: auto;
         }
 
-        #pause-toggle {
+        .hud-actions {
             margin-top: 6px;
+            display: flex;
+            gap: 6px;
+            pointer-events: auto;
         }
 
         #audio-toggle:disabled,
@@ -240,7 +244,7 @@
 
         @media (max-width: 560px) {
             body {
-                padding: 8px;
+                padding: 6px;
             }
 
             #game-shell {
@@ -248,16 +252,55 @@
                 border-radius: 14px;
             }
 
+            #hud {
+                top: 4px;
+                left: 4px;
+                right: 4px;
+                gap: 4px;
+            }
+
             .hud-panel {
-                min-width: 126px;
+                min-width: 102px;
+                padding: 6px 7px;
+            }
+
+            .hud-label {
+                font-size: 10px;
             }
 
             .hud-value {
-                font-size: 20px;
+                font-size: 16px;
+            }
+
+            .hud-small {
+                margin-top: 3px;
+                font-size: 10px;
+            }
+
+            #audio-toggle,
+            #pause-toggle {
+                padding: 4px 6px;
+                font-size: 10px;
+            }
+
+            .hud-actions {
+                margin-top: 3px;
+                gap: 3px;
             }
 
             .overlay p {
                 font-size: 14px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .hud-panel {
+                min-width: 94px;
+                padding: 5px 6px;
+            }
+
+            .hud-value {
+                font-size: 15px;
             }
         }
     </style>
@@ -276,8 +319,12 @@
                 <div class="hud-label">生命 / 最高分</div>
                 <div class="hud-value" id="lives">3</div>
                 <div class="hud-small" id="best">Best 0</div>
-                <button id="audio-toggle" type="button">SOUND: ON</button>
-                <button id="pause-toggle" type="button" disabled>PAUSE</button>
+                <div class="hud-small" id="weapon">Weapon NORMAL</div>
+                <div class="hud-small" id="weapon-timer">Bomb Ready</div>
+                <div class="hud-actions">
+                    <button id="audio-toggle" type="button">SOUND: ON</button>
+                    <button id="pause-toggle" type="button" disabled>PAUSE</button>
+                </div>
             </div>
         </section>
 
