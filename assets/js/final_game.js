@@ -636,8 +636,15 @@
         }
 
         if (state.weaponMode === "missile") {
-            state.fireTimer = 0.28 * fireRatio;
-            const offsets = state.keys.Space ? [-12, 12] : [0];
+            state.fireTimer = 0.24 * fireRatio;
+            const dualFire = state.keys.Space || state.elapsed > 52 || state.score > 8200;
+            const offsets = dualFire ? [-12, 12] : [0];
+            const turnRate = 7.9 + Math.min(10.8, state.elapsed * 0.06 + state.score * 0.0003);
+            const maxSpeed = 620 + Math.min(360, state.elapsed * 2.3 + state.score * 0.028);
+            const accel = 640 + Math.min(560, state.elapsed * 5.6 + state.score * 0.02);
+            const startSpeed = Math.min(maxSpeed * 0.72, 470 + state.elapsed * 1.7);
+            const baseDamage = 2.6 + Math.min(1.8, state.elapsed * 0.01 + state.score * 0.00012);
+
             for (const offset of offsets) {
                 state.bullets.push({
                     kind: "missile",
@@ -645,11 +652,15 @@
                     y: originY,
                     w: 14,
                     h: 30,
-                    vx: offset * 2.6,
-                    vy: -420,
-                    speed: 560,
-                    turnRate: 8.5,
-                    damage: 2.4,
+                    vx: offset * 8,
+                    vy: -startSpeed,
+                    speed: startSpeed,
+                    maxSpeed,
+                    accel,
+                    turnRate,
+                    damage: baseDamage,
+                    proximity: 24,
+                    life: 3.4,
                     rotation: 0,
                     trailTimer: 0
                 });
@@ -908,16 +919,46 @@
         for (let i = state.bullets.length - 1; i >= 0; i -= 1) {
             const bullet = state.bullets[i];
             if (bullet.kind === "missile") {
-                const target = findClosestEnemy(bullet.x, bullet.y);
+                bullet.life = (bullet.life || 3) - dt;
+                if (bullet.life <= 0) {
+                    explodeMissile(bullet.x, bullet.y, (bullet.damage || 2.2) * 0.7);
+                    state.bullets.splice(i, 1);
+                    continue;
+                }
+
+                const target = findMissileTarget(bullet);
                 if (target) {
+                    const velocity = estimateEnemyVelocity(target);
                     const dx = target.x - bullet.x;
                     const dy = target.y - bullet.y;
-                    const len = Math.hypot(dx, dy) || 1;
-                    const desiredVx = (dx / len) * bullet.speed;
-                    const desiredVy = (dy / len) * bullet.speed;
-                    const steer = Math.min(1, bullet.turnRate * dt);
-                    bullet.vx += (desiredVx - bullet.vx) * steer;
-                    bullet.vy += (desiredVy - bullet.vy) * steer;
+                    const dist = Math.hypot(dx, dy) || 1;
+                    const travelTime = clamp(dist / Math.max(220, bullet.speed || 1), 0.06, 0.46);
+
+                    const aimX = target.x + velocity.vx * travelTime;
+                    const aimY = target.y + velocity.vy * travelTime;
+                    const desiredAngle = Math.atan2(aimY - bullet.y, aimX - bullet.x);
+                    const currentAngle = Math.atan2(bullet.vy, bullet.vx);
+                    const nextAngle = rotateTowards(currentAngle, desiredAngle, (bullet.turnRate || 8) * dt);
+
+                    bullet.speed = Math.min(bullet.maxSpeed || bullet.speed, bullet.speed + (bullet.accel || 0) * dt);
+                    bullet.vx = Math.cos(nextAngle) * bullet.speed;
+                    bullet.vy = Math.sin(nextAngle) * bullet.speed;
+
+                    const proximity = bullet.proximity || 22;
+                    const detonateDistance = Math.max(16, (target.w + target.h) * 0.22 + proximity);
+                    if (dist <= detonateDistance) {
+                        explodeMissile(bullet.x, bullet.y, bullet.damage || 2.2);
+                        state.bullets.splice(i, 1);
+                        continue;
+                    }
+                } else {
+                    bullet.speed = Math.min(
+                        bullet.maxSpeed || bullet.speed,
+                        bullet.speed + (bullet.accel || 0) * dt * 0.55
+                    );
+                    const angle = Math.atan2(bullet.vy, bullet.vx);
+                    bullet.vx = Math.cos(angle) * bullet.speed;
+                    bullet.vy = Math.sin(angle) * bullet.speed;
                 }
 
                 bullet.rotation = Math.atan2(bullet.vy, bullet.vx) + Math.PI / 2;
@@ -951,20 +992,45 @@
         }
     }
 
-    function findClosestEnemy(x, y) {
+    function findMissileTarget(bullet) {
         let best = null;
-        let bestDist = Infinity;
+        let bestScore = Infinity;
         for (const enemy of state.enemies) {
-            const dy = enemy.y - y;
-            if (dy > 210) continue;
-            const dx = enemy.x - x;
-            const d2 = dx * dx + dy * dy;
-            if (d2 < bestDist) {
-                bestDist = d2;
+            const dx = enemy.x - bullet.x;
+            const dy = enemy.y - bullet.y;
+            if (dy > 180) continue;
+
+            const dist = Math.hypot(dx, dy);
+            if (dist > 520) continue;
+
+            let score = dist;
+            if (dy > 0) score += 85;
+            if (enemy.kind === "destroyer") score -= 125;
+            else if (enemy.kind === "ace") score -= 90;
+            else if (enemy.kind === "elite") score -= 55;
+            else if (enemy.type === "meteor") score -= 24;
+
+            if (score < bestScore) {
+                bestScore = score;
                 best = enemy;
             }
         }
         return best;
+    }
+
+    function estimateEnemyVelocity(enemy) {
+        return {
+            vx: Math.sin(enemy.phase || 0) * (enemy.drift || 0),
+            vy: enemy.vy || 0
+        };
+    }
+
+    function rotateTowards(currentAngle, targetAngle, maxStep) {
+        let diff = targetAngle - currentAngle;
+        const fullTurn = Math.PI * 2;
+        while (diff > Math.PI) diff -= fullTurn;
+        while (diff < -Math.PI) diff += fullTurn;
+        return currentAngle + clamp(diff, -maxStep, maxStep);
     }
 
     function updateEnemyBullets(dt) {
