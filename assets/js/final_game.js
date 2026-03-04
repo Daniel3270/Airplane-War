@@ -82,6 +82,7 @@
     const pausePill = document.getElementById("pause-pill");
     const loadingEl = document.getElementById("loading");
     const audioToggleBtn = document.getElementById("audio-toggle");
+    const pauseToggleBtn = document.getElementById("pause-toggle");
     const hudEl = document.getElementById("hud");
     const gameShell = document.getElementById("game-shell");
 
@@ -165,6 +166,19 @@
         if (!audioToggleBtn) return;
         const volumePct = Math.round(state.masterVolume * 100);
         audioToggleBtn.textContent = state.muted ? "SOUND: OFF" : `SOUND: ON ${volumePct}%`;
+    }
+
+    function updatePauseButton() {
+        if (!pauseToggleBtn) return;
+
+        if (!state.running) {
+            pauseToggleBtn.textContent = "PAUSE";
+            pauseToggleBtn.disabled = true;
+            return;
+        }
+
+        pauseToggleBtn.disabled = false;
+        pauseToggleBtn.textContent = state.paused ? "RESUME" : "PAUSE";
     }
 
     function setBgmVolume() {
@@ -274,6 +288,7 @@
             startBtn.textContent = "Start Game";
             updateHud();
             updateAudioButton();
+            updatePauseButton();
         });
     }
     function imageUsable(name) {
@@ -309,6 +324,7 @@
         gameoverOverlay.classList.add("hidden");
         pausePill.style.display = "none";
         updateHud();
+        updatePauseButton();
 
         if (!state.audioBooted) {
             state.audioBooted = true;
@@ -332,6 +348,7 @@
         finalScoreEl.textContent = String(state.score);
         finalBestEl.textContent = String(state.bestScore);
         updateHud();
+        updatePauseButton();
         gameoverOverlay.classList.remove("hidden");
     }
 
@@ -1124,6 +1141,7 @@
         if (!state.running) return;
         state.paused = !state.paused;
         pausePill.style.display = state.paused ? "block" : "none";
+        updatePauseButton();
         if (state.paused) {
             stopBgm();
         } else {
@@ -1293,8 +1311,15 @@
         });
     }
 
+    if (pauseToggleBtn) {
+        pauseToggleBtn.addEventListener("click", () => {
+            togglePause();
+        });
+    }
+
     updateHud();
     updateAudioButton();
+    updatePauseButton();
 
     loadAssets().catch(() => {
         loadingEl.textContent = "素材加载失败，请刷新重试";
@@ -1302,6 +1327,7 @@
         startBtn.disabled = false;
         startBtn.textContent = "仍然开始（无素材模式）";
         state.ready = true;
+        updatePauseButton();
     });
 
     render();

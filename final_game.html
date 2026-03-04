@@ -103,7 +103,8 @@
             color: var(--text-weak);
         }
 
-        #audio-toggle {
+        #audio-toggle,
+        #pause-toggle {
             margin-top: 8px;
             width: 100%;
             border: 1px solid rgba(160, 212, 255, 0.7);
@@ -114,6 +115,16 @@
             font-size: 12px;
             cursor: pointer;
             pointer-events: auto;
+        }
+
+        #pause-toggle {
+            margin-top: 6px;
+        }
+
+        #audio-toggle:disabled,
+        #pause-toggle:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
         }
 
         #pause-pill {
@@ -266,6 +277,7 @@
                 <div class="hud-value" id="lives">3</div>
                 <div class="hud-small" id="best">Best 0</div>
                 <button id="audio-toggle" type="button">SOUND: ON</button>
+                <button id="pause-toggle" type="button" disabled>PAUSE</button>
             </div>
         </section>
 
