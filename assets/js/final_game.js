@@ -123,6 +123,7 @@
         lives: CONFIG.maxLives,
         weaponMode: "normal",
         weaponTimer: 0,
+        laserDual: false,
         bestScore: loadBestScore(),
         stars: createStars(95),
         bullets: [],
@@ -330,6 +331,7 @@
         state.lives = CONFIG.maxLives;
         state.weaponMode = "normal";
         state.weaponTimer = 0;
+        state.laserDual = false;
         state.bullets = [];
         state.enemyBullets = [];
         state.enemies = [];
@@ -362,6 +364,7 @@
         state.paused = false;
         state.weaponMode = "normal";
         state.weaponTimer = 0;
+        state.laserDual = false;
         state.pickups = [];
         pausePill.style.display = "none";
         stopBgm();
@@ -486,6 +489,7 @@
             state.weaponMode = "normal";
             state.weaponTimer = 0;
             state.weaponTickTimer = 0;
+            state.laserDual = false;
             return;
         }
 
@@ -505,7 +509,7 @@
         if (!state.running || state.paused) return;
 
         const beamXs = getLaserBeamXs();
-        const beamHalfWidth = 24;
+        const beamHalfWidth = 18;
         let touched = false;
         for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
             const enemy = state.enemies[i];
@@ -540,7 +544,10 @@
 
     function getLaserBeamXs() {
         const centerX = state.player.x;
-        return [centerX - 12, centerX + 12];
+        if (state.weaponMode !== "laser" || !state.laserDual) {
+            return [centerX];
+        }
+        return [centerX - 28, centerX + 28];
     }
 
     function spawnPickups(dt) {
@@ -597,6 +604,7 @@
             detonateSmartBomb();
             burst(x, y, 24, ["#ffe9c0", "#ffd67e", "#ff8e54"]);
         } else if (type === "laser") {
+            state.laserDual = true;
             setWeaponMode("laser", CONFIG.weaponDuration);
             burst(x, y, 18, ["#d8f6ff", "#87e3ff", "#43c2ff"]);
         } else if (type === "missile") {
@@ -740,7 +748,9 @@
     }
 
     function spawnEnemyFromLibrary() {
-        const diff = Math.min(1.82, 1 + state.elapsed * 0.017 + state.score * 0.00009);
+        const timeFactor = Math.min(1, state.elapsed / 480);
+        const scoreFactor = Math.min(1, state.score / 42000);
+        const diff = 1 + timeFactor * 0.44 + scoreFactor * 0.2;
         const roll = Math.random();
         let template;
 
@@ -903,7 +913,9 @@
     }
 
     function spawnMeteor() {
-        const diff = Math.min(1.65, 1 + state.elapsed * 0.012 + state.score * 0.00007);
+        const timeFactor = Math.min(1, state.elapsed / 520);
+        const scoreFactor = Math.min(1, state.score / 50000);
+        const diff = 1 + timeFactor * 0.34 + scoreFactor * 0.16;
         const template = Math.random() < 0.5
             ? { image: "meteor1", hp: 3, score: 240, speedMin: 84, speedMax: 145, scale: 0.24 }
             : { image: "meteor2", hp: 4, score: 300, speedMin: 80, speedMax: 132, scale: 0.24 };
@@ -1535,17 +1547,17 @@
             glow.addColorStop(0.45, "rgba(102, 229, 255, 0.24)");
             glow.addColorStop(1, "rgba(132, 248, 255, 0.08)");
             ctx.fillStyle = glow;
-            ctx.fillRect(x - 18, y1, 36, y0 - y1);
+            ctx.fillRect(x - 12, y1, 24, y0 - y1);
 
             ctx.strokeStyle = "rgba(98, 230, 255, 0.42)";
-            ctx.lineWidth = 8;
+            ctx.lineWidth = 5.5;
             ctx.beginPath();
             ctx.moveTo(x + wave, y0);
             ctx.lineTo(x - wave, y1);
             ctx.stroke();
 
             ctx.strokeStyle = "rgba(220, 251, 255, 0.95)";
-            ctx.lineWidth = 2.8;
+            ctx.lineWidth = 2.2;
             ctx.beginPath();
             ctx.moveTo(x, y0);
             ctx.lineTo(x, y1);
