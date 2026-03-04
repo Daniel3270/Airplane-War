@@ -504,20 +504,28 @@
     function applyLaserDamage() {
         if (!state.running || state.paused) return;
 
-        const beamHalfWidth = 28;
+        const beamXs = getLaserBeamXs();
+        const beamHalfWidth = 24;
         let touched = false;
         for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
             const enemy = state.enemies[i];
             if (enemy.y > state.player.y + 8) continue;
 
             const hitWidth = beamHalfWidth + enemy.w * (enemy.type === "meteor" ? 0.28 : 0.4);
-            if (Math.abs(enemy.x - state.player.x) > hitWidth) continue;
+            let hitCount = 0;
+            for (const beamX of beamXs) {
+                if (Math.abs(enemy.x - beamX) <= hitWidth) {
+                    hitCount += 1;
+                }
+            }
+            if (hitCount === 0) continue;
 
             let damage = 2.35;
             if (enemy.type === "meteor") damage = 2.05;
             if (enemy.kind === "elite") damage = 2.5;
             if (enemy.kind === "ace") damage = 2.65;
             if (enemy.kind === "destroyer") damage = 1.75;
+            damage *= 1 + (hitCount - 1) * 0.42;
             enemy.hp -= damage;
             touched = true;
             if (enemy.hp <= 0) {
@@ -528,6 +536,11 @@
         if (touched && Math.random() < 0.3) {
             playSfx("hit", 0.12, randomRange(1.05, 1.2));
         }
+    }
+
+    function getLaserBeamXs() {
+        const centerX = state.player.x;
+        return [centerX - 12, centerX + 12];
     }
 
     function spawnPickups(dt) {
@@ -1507,34 +1520,37 @@
             return;
         }
 
-        const x = state.player.x;
+        const beamXs = getLaserBeamXs();
         const y0 = state.player.y - state.player.h * 0.55;
         const y1 = 0;
-        const wave = Math.sin(state.elapsed * 36) * 2;
 
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
 
-        const glow = ctx.createLinearGradient(0, y0, 0, y1);
-        glow.addColorStop(0, "rgba(144, 238, 255, 0.06)");
-        glow.addColorStop(0.45, "rgba(102, 229, 255, 0.2)");
-        glow.addColorStop(1, "rgba(132, 248, 255, 0.06)");
-        ctx.fillStyle = glow;
-        ctx.fillRect(x - 26, y1, 52, y0 - y1);
+        for (let n = 0; n < beamXs.length; n += 1) {
+            const x = beamXs[n];
+            const wave = Math.sin(state.elapsed * 36 + n * 1.3) * 1.8;
+            const glow = ctx.createLinearGradient(0, y0, 0, y1);
+            glow.addColorStop(0, "rgba(144, 238, 255, 0.08)");
+            glow.addColorStop(0.45, "rgba(102, 229, 255, 0.24)");
+            glow.addColorStop(1, "rgba(132, 248, 255, 0.08)");
+            ctx.fillStyle = glow;
+            ctx.fillRect(x - 18, y1, 36, y0 - y1);
 
-        ctx.strokeStyle = "rgba(98, 230, 255, 0.35)";
-        ctx.lineWidth = 10;
-        ctx.beginPath();
-        ctx.moveTo(x + wave, y0);
-        ctx.lineTo(x - wave, y1);
-        ctx.stroke();
+            ctx.strokeStyle = "rgba(98, 230, 255, 0.42)";
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.moveTo(x + wave, y0);
+            ctx.lineTo(x - wave, y1);
+            ctx.stroke();
 
-        ctx.strokeStyle = "rgba(220, 251, 255, 0.95)";
-        ctx.lineWidth = 3.2;
-        ctx.beginPath();
-        ctx.moveTo(x, y0);
-        ctx.lineTo(x, y1);
-        ctx.stroke();
+            ctx.strokeStyle = "rgba(220, 251, 255, 0.95)";
+            ctx.lineWidth = 2.8;
+            ctx.beginPath();
+            ctx.moveTo(x, y0);
+            ctx.lineTo(x, y1);
+            ctx.stroke();
+        }
         ctx.restore();
     }
 
