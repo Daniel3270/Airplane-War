@@ -11,7 +11,7 @@
         baseFireCooldown: 0.14,
         spawnBase: 0.92,
         spawnMin: 0.25,
-        spawnRampPerSecond: 0.008,
+        spawnRampPerSecond: 0.0055,
         pickupBaseInterval: 9.2,
         pickupMinInterval: 5.0,
         pickupRampPerSecond: 0.01,
@@ -636,14 +636,14 @@
         }
 
         if (state.weaponMode === "missile") {
-            state.fireTimer = 0.24 * fireRatio;
-            const dualFire = state.keys.Space || state.elapsed > 52 || state.score > 8200;
-            const offsets = dualFire ? [-12, 12] : [0];
-            const turnRate = 9.6 + Math.min(13.5, state.elapsed * 0.08 + state.score * 0.00034);
-            const maxSpeed = 820 + Math.min(520, state.elapsed * 3.2 + state.score * 0.038);
-            const accel = 980 + Math.min(780, state.elapsed * 7.2 + state.score * 0.028);
-            const startSpeed = Math.min(maxSpeed * 0.82, 620 + state.elapsed * 2.7);
-            const baseDamage = 2.6 + Math.min(1.8, state.elapsed * 0.01 + state.score * 0.00012);
+            state.fireTimer = 0.22 * fireRatio;
+            const tripleFire = state.keys.Space || state.elapsed > 68 || state.score > 12000;
+            const offsets = tripleFire ? [-18, 0, 18] : [-12, 12];
+            const turnRate = 10.4 + Math.min(14.5, state.elapsed * 0.09 + state.score * 0.00038);
+            const maxSpeed = 920 + Math.min(620, state.elapsed * 3.8 + state.score * 0.045);
+            const accel = 1280 + Math.min(860, state.elapsed * 8.1 + state.score * 0.034);
+            const startSpeed = Math.min(maxSpeed * 0.9, 760 + state.elapsed * 3.1);
+            const baseDamage = 2.45 + Math.min(1.5, state.elapsed * 0.008 + state.score * 0.0001);
 
             for (const offset of offsets) {
                 state.bullets.push({
@@ -660,7 +660,8 @@
                     turnRate,
                     damage: baseDamage,
                     proximity: 28,
-                    life: 3.8,
+                    life: 4.0,
+                    launchBoost: 0.28,
                     rotation: 0,
                     trailTimer: 0
                 });
@@ -703,7 +704,7 @@
 
         const interval = Math.max(
             CONFIG.spawnMin,
-            CONFIG.spawnBase - state.elapsed * CONFIG.spawnRampPerSecond - Math.min(0.24, state.score * 0.00002)
+            CONFIG.spawnBase - state.elapsed * CONFIG.spawnRampPerSecond - Math.min(0.14, state.score * 0.000012)
         );
 
         if (state.spawnTimer < interval) return;
@@ -716,13 +717,13 @@
         }
 
         spawnEnemyFromLibrary();
-        if (Math.random() < Math.min(0.4, state.elapsed * 0.004 + state.score * 0.000008)) {
+        if (Math.random() < Math.min(0.28, state.elapsed * 0.0024 + state.score * 0.0000045)) {
             spawnEnemyFromLibrary();
         }
     }
 
     function spawnEnemyFromLibrary() {
-        const diff = 1 + state.elapsed * 0.045 + state.score * 0.00025;
+        const diff = 1 + state.elapsed * 0.028 + state.score * 0.00016;
         const roll = Math.random();
         let template;
 
@@ -885,7 +886,7 @@
     }
 
     function spawnMeteor() {
-        const diff = 1 + state.elapsed * 0.03 + state.score * 0.00019;
+        const diff = 1 + state.elapsed * 0.02 + state.score * 0.00012;
         const template = Math.random() < 0.5
             ? { image: "meteor1", hp: 3, score: 240, speedMin: 95, speedMax: 165, scale: 0.24 }
             : { image: "meteor2", hp: 4, score: 300, speedMin: 90, speedMax: 150, scale: 0.24 };
@@ -926,6 +927,14 @@
                     continue;
                 }
 
+                if ((bullet.launchBoost || 0) > 0) {
+                    bullet.speed = Math.min(
+                        bullet.maxSpeed || bullet.speed,
+                        bullet.speed + (bullet.accel || 0) * dt * 1.9
+                    );
+                    bullet.launchBoost = Math.max(0, bullet.launchBoost - dt);
+                }
+
                 const target = findMissileTarget(bullet);
                 if (target) {
                     const velocity = estimateEnemyVelocity(target);
@@ -940,7 +949,10 @@
                     const currentAngle = Math.atan2(bullet.vy, bullet.vx);
                     const nextAngle = rotateTowards(currentAngle, desiredAngle, (bullet.turnRate || 8) * dt);
 
-                    bullet.speed = Math.min(bullet.maxSpeed || bullet.speed, bullet.speed + (bullet.accel || 0) * dt);
+                    bullet.speed = Math.min(
+                        bullet.maxSpeed || bullet.speed,
+                        bullet.speed + (bullet.accel || 0) * dt * 1.25
+                    );
                     bullet.vx = Math.cos(nextAngle) * bullet.speed;
                     bullet.vy = Math.sin(nextAngle) * bullet.speed;
 
@@ -954,7 +966,7 @@
                 } else {
                     bullet.speed = Math.min(
                         bullet.maxSpeed || bullet.speed,
-                        bullet.speed + (bullet.accel || 0) * dt * 0.9
+                        bullet.speed + (bullet.accel || 0) * dt * 1.1
                     );
                     const angle = Math.atan2(bullet.vy, bullet.vx);
                     bullet.vx = Math.cos(angle) * bullet.speed;
