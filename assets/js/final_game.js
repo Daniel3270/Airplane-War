@@ -96,6 +96,7 @@
     const audioToggleBtn = document.getElementById("audio-toggle");
     const pauseToggleBtn = document.getElementById("pause-toggle");
     const hudEl = document.getElementById("hud");
+    const hudControlsEl = document.getElementById("hud-controls");
     const gameShell = document.getElementById("game-shell");
 
     const images = Object.create(null);
@@ -1631,6 +1632,9 @@
         if (!hudEl) return;
         state.hudVisible = !state.hudVisible;
         hudEl.style.display = state.hudVisible ? "flex" : "none";
+        if (hudControlsEl) {
+            hudControlsEl.style.display = state.hudVisible ? "flex" : "none";
+        }
     }
 
     function toggleFullscreen() {

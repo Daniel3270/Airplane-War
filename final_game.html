@@ -64,23 +64,25 @@
 
         #hud {
             position: absolute;
-            top: 8px;
-            left: 8px;
-            right: 8px;
+            top: 6px;
+            left: 6px;
+            right: 6px;
             display: flex;
             justify-content: space-between;
-            gap: 6px;
+            align-items: flex-start;
+            gap: 5px;
             z-index: 20;
             pointer-events: none;
         }
 
         .hud-panel {
-            background: var(--panel);
+            background: rgba(7, 15, 33, 0.52);
             border: 1px solid var(--line);
-            border-radius: 12px;
-            padding: 8px 10px;
-            backdrop-filter: blur(6px);
-            min-width: 124px;
+            border-radius: 10px;
+            padding: 6px 8px;
+            backdrop-filter: blur(4px);
+            min-width: 104px;
+            max-width: 48%;
         }
 
         .hud-label {
@@ -92,14 +94,14 @@
 
         .hud-value {
             margin-top: 2px;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             line-height: 1;
         }
 
         .hud-small {
-            margin-top: 5px;
-            font-size: 12px;
+            margin-top: 3px;
+            font-size: 11px;
             color: var(--text-weak);
         }
 
@@ -110,19 +112,25 @@
             flex: 1 1 0;
             border: 1px solid rgba(160, 212, 255, 0.7);
             border-radius: 8px;
-            padding: 6px 8px;
+            padding: 5px 7px;
             background: rgba(18, 34, 62, 0.85);
             color: #cfe9ff;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
             pointer-events: auto;
         }
 
         .hud-actions {
-            margin-top: 6px;
             display: flex;
-            gap: 6px;
+            gap: 5px;
             pointer-events: auto;
+        }
+
+        #hud-controls {
+            position: absolute;
+            right: 6px;
+            bottom: 8px;
+            z-index: 22;
         }
 
         #audio-toggle:disabled,
@@ -133,7 +141,7 @@
 
         #pause-pill {
             position: absolute;
-            top: 20px;
+            top: 14px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 25;
@@ -260,8 +268,8 @@
             }
 
             .hud-panel {
-                min-width: 102px;
-                padding: 6px 7px;
+                min-width: 90px;
+                padding: 5px 6px;
             }
 
             .hud-label {
@@ -269,11 +277,11 @@
             }
 
             .hud-value {
-                font-size: 16px;
+                font-size: 15px;
             }
 
             .hud-small {
-                margin-top: 3px;
+                margin-top: 2px;
                 font-size: 10px;
             }
 
@@ -284,8 +292,12 @@
             }
 
             .hud-actions {
-                margin-top: 3px;
                 gap: 3px;
+            }
+
+            #hud-controls {
+                right: 4px;
+                bottom: 6px;
             }
 
             .overlay p {
@@ -295,12 +307,18 @@
 
         @media (max-width: 420px) {
             .hud-panel {
-                min-width: 94px;
-                padding: 5px 6px;
+                min-width: 82px;
+                padding: 4px 5px;
             }
 
             .hud-value {
-                font-size: 15px;
+                font-size: 14px;
+            }
+
+            #audio-toggle,
+            #pause-toggle {
+                padding: 3px 5px;
+                font-size: 9px;
             }
         }
     </style>
@@ -321,12 +339,13 @@
                 <div class="hud-small" id="best">Best 0</div>
                 <div class="hud-small" id="weapon">Weapon NORMAL</div>
                 <div class="hud-small" id="weapon-timer">Bomb Ready</div>
-                <div class="hud-actions">
-                    <button id="audio-toggle" type="button">SOUND: ON</button>
-                    <button id="pause-toggle" type="button" disabled>PAUSE</button>
-                </div>
             </div>
         </section>
+
+        <div id="hud-controls" class="hud-actions">
+            <button id="audio-toggle" type="button">SOUND: ON</button>
+            <button id="pause-toggle" type="button" disabled>PAUSE</button>
+        </div>
 
         <div id="pause-pill">已暂停（P / ESC 继续）</div>
 
