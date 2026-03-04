@@ -317,7 +317,8 @@
         }
 
         #profile-meta,
-        #profile-history {
+        #profile-history,
+        #cloud-status {
             margin-top: 6px;
             font-size: 12px;
             color: #bfd9ee;
@@ -479,6 +480,7 @@
             .profile-label,
             #profile-meta,
             #profile-history,
+            #cloud-status,
             #leaderboard-list,
             #profile-input,
             #profile-select,
@@ -549,7 +551,8 @@
             </div>
             <div id="profile-meta">当前用户: Pilot | Best 0</div>
             <div id="profile-history">暂无战绩</div>
-            <div class="leaderboard-title">排行榜（Top 10）</div>
+            <div id="cloud-status">排行模式：本机（未配置云端）</div>
+            <div class="leaderboard-title" id="leaderboard-title">排行榜（Top 10）</div>
             <ol id="leaderboard-list"></ol>
         </section>
 
@@ -586,6 +589,7 @@
 
         <div id="loading">正在加载素材...</div>
     </main>
+    <script src="assets/js/cloud_config.js"></script>
     <script src="assets/js/final_game.js"></script>
 </body>
 </html>

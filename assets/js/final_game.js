@@ -105,9 +105,20 @@
     const profileMetaEl = document.getElementById("profile-meta");
     const profileHistoryEl = document.getElementById("profile-history");
     const leaderboardListEl = document.getElementById("leaderboard-list");
+    const leaderboardTitleEl = document.getElementById("leaderboard-title");
+    const cloudStatusEl = document.getElementById("cloud-status");
     const profileOpenBtn = document.getElementById("profile-open");
     const profileDockEl = document.getElementById("profile-dock");
     const openProfileStartBtn = document.getElementById("open-profile-start");
+
+    const CLOUD_CONFIG = window.CLOUD_CONFIG || {};
+    const CLOUD = {
+        supabaseUrl: normalizeCloudUrl(CLOUD_CONFIG.supabaseUrl),
+        supabaseAnonKey: String(CLOUD_CONFIG.supabaseAnonKey || "").trim(),
+        table: String(CLOUD_CONFIG.table || "airplane_scores").trim() || "airplane_scores",
+        refreshMs: parseCloudRefreshMs(CLOUD_CONFIG.autoRefreshMs)
+    };
+    const CLOUD_ENABLED = Boolean(CLOUD.supabaseUrl && CLOUD.supabaseAnonKey && CLOUD.table);
 
     const images = Object.create(null);
     const sounds = Object.create(null);
@@ -134,6 +145,12 @@
         weaponMode: "normal",
         weaponTimer: 0,
         laserDual: false,
+        cloudEnabled: CLOUD_ENABLED,
+        cloudLoading: false,
+        cloudSyncing: false,
+        cloudError: "",
+        cloudLeaderboard: [],
+        cloudNextRefreshAt: 0,
         bestScore: 0,
         profiles: loadProfiles(),
         activeUser: "",
@@ -194,6 +211,18 @@
 
     function normalizeUserName(raw) {
         return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 16);
+    }
+
+    function normalizeCloudUrl(raw) {
+        return String(raw || "").trim().replace(/\/+$/, "");
+    }
+
+    function parseCloudRefreshMs(raw) {
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= 8000) {
+            return Math.floor(n);
+        }
+        return 30000;
     }
 
     function loadProfiles() {
@@ -328,6 +357,10 @@
         updateProfilePanel();
         updateLeaderboardPanel();
         updateHud();
+        if (state.cloudEnabled) {
+            void syncCloudBestForUser(safeName);
+            void refreshCloudLeaderboard(true);
+        }
     }
 
     function pushProfileRecord(score) {
@@ -351,6 +384,9 @@
         saveProfiles();
         updateProfilePanel();
         updateLeaderboardPanel();
+        if (state.cloudEnabled && profile.bestScore > 0) {
+            void syncCloudBestForUser(state.activeUser);
+        }
     }
 
     function formatRecordTime(ts) {
@@ -361,6 +397,225 @@
         const hh = String(d.getHours()).padStart(2, "0");
         const mi = String(d.getMinutes()).padStart(2, "0");
         return `${mm}-${dd} ${hh}:${mi}`;
+    }
+
+    function parseBestScore(raw) {
+        const score = Number(raw);
+        return Number.isFinite(score) && score > 0 ? Math.floor(score) : 0;
+    }
+
+    function cloudApiUrl(query) {
+        return `${CLOUD.supabaseUrl}/rest/v1/${encodeURIComponent(CLOUD.table)}${query}`;
+    }
+
+    function cloudHeaders(extra) {
+        return Object.assign(
+            {
+                apikey: CLOUD.supabaseAnonKey,
+                Authorization: `Bearer ${CLOUD.supabaseAnonKey}`
+            },
+            extra || {}
+        );
+    }
+
+    async function fetchWithTimeout(url, options, timeoutMs) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs || 8000);
+        try {
+            return await fetch(url, Object.assign({}, options || {}, { signal: controller.signal }));
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    async function fetchCloudBestForUser(name) {
+        const query = `?select=username,best_score&username=eq.${encodeURIComponent(name)}&limit=1`;
+        const res = await fetchWithTimeout(
+            cloudApiUrl(query),
+            {
+                method: "GET",
+                headers: cloudHeaders()
+            },
+            9000
+        );
+
+        if (!res.ok) {
+            throw new Error(`cloud_read_user_${res.status}`);
+        }
+
+        const rows = await res.json();
+        if (!Array.isArray(rows) || !rows.length) return 0;
+        return parseBestScore(rows[0].best_score);
+    }
+
+    async function upsertCloudBestForUser(name, bestScore) {
+        const payload = [
+            {
+                username: name,
+                best_score: bestScore,
+                updated_at: new Date().toISOString()
+            }
+        ];
+
+        const res = await fetchWithTimeout(
+            cloudApiUrl(""),
+            {
+                method: "POST",
+                headers: cloudHeaders({
+                    "Content-Type": "application/json",
+                    Prefer: "resolution=merge-duplicates,return=minimal"
+                }),
+                body: JSON.stringify(payload)
+            },
+            9000
+        );
+
+        if (!res.ok) {
+            throw new Error(`cloud_upsert_${res.status}`);
+        }
+    }
+
+    async function fetchCloudTopLeaderboard() {
+        const query = "?select=username,best_score,updated_at&order=best_score.desc,updated_at.asc&limit=10";
+        const res = await fetchWithTimeout(
+            cloudApiUrl(query),
+            {
+                method: "GET",
+                headers: cloudHeaders()
+            },
+            9000
+        );
+
+        if (!res.ok) {
+            throw new Error(`cloud_top_${res.status}`);
+        }
+
+        const rows = await res.json();
+        if (!Array.isArray(rows)) return [];
+
+        return rows
+            .map((row) => {
+                return {
+                    name: normalizeUserName(row && row.username),
+                    bestScore: parseBestScore(row && row.best_score)
+                };
+            })
+            .filter((row) => row.name && row.bestScore > 0)
+            .slice(0, 10);
+    }
+
+    async function refreshCloudLeaderboard(force) {
+        if (!state.cloudEnabled) return;
+
+        const now = Date.now();
+        if (!force && now < state.cloudNextRefreshAt) return;
+        state.cloudNextRefreshAt = now + CLOUD.refreshMs;
+        state.cloudLoading = true;
+        updateCloudStatus();
+
+        try {
+            const rows = await fetchCloudTopLeaderboard();
+            state.cloudLeaderboard = rows;
+            state.cloudError = "";
+        } catch (err) {
+            state.cloudError = err && err.message ? err.message : "cloud_refresh_failed";
+        } finally {
+            state.cloudLoading = false;
+            updateCloudStatus();
+            updateLeaderboardPanel();
+        }
+    }
+
+    async function pullCloudBestForUser(name) {
+        if (!state.cloudEnabled) return;
+        const safeName = normalizeUserName(name);
+        if (!safeName) return;
+
+        try {
+            const remoteBest = await fetchCloudBestForUser(safeName);
+            if (remoteBest <= 0) return;
+
+            ensureUser(safeName);
+            const profile = state.profiles.users[safeName];
+            if (!profile || remoteBest <= profile.bestScore) return;
+
+            profile.bestScore = remoteBest;
+            if (safeName === state.activeUser) {
+                state.bestScore = remoteBest;
+            }
+            saveProfiles();
+            updateProfilePanel();
+            updateLeaderboardPanel();
+            updateHud();
+        } catch (err) {
+            state.cloudError = err && err.message ? err.message : "cloud_pull_failed";
+            updateCloudStatus();
+        }
+    }
+
+    async function syncCloudBestForUser(name) {
+        if (!state.cloudEnabled || state.cloudSyncing) return;
+
+        const safeName = normalizeUserName(name);
+        if (!safeName) return;
+
+        ensureUser(safeName);
+        const profile = state.profiles.users[safeName];
+        if (!profile) return;
+
+        state.cloudSyncing = true;
+        updateCloudStatus();
+        try {
+            const localBest = parseBestScore(profile.bestScore);
+            const remoteBest = await fetchCloudBestForUser(safeName);
+
+            if (localBest > remoteBest) {
+                await upsertCloudBestForUser(safeName, localBest);
+            } else if (remoteBest > localBest) {
+                profile.bestScore = remoteBest;
+                if (safeName === state.activeUser) {
+                    state.bestScore = remoteBest;
+                }
+                saveProfiles();
+                updateProfilePanel();
+                updateHud();
+            }
+
+            state.cloudError = "";
+            await refreshCloudLeaderboard(true);
+        } catch (err) {
+            state.cloudError = err && err.message ? err.message : "cloud_sync_failed";
+            updateCloudStatus();
+        } finally {
+            state.cloudSyncing = false;
+            updateCloudStatus();
+        }
+    }
+
+    function updateCloudStatus() {
+        if (!cloudStatusEl) return;
+
+        if (!state.cloudEnabled) {
+            cloudStatusEl.textContent = "排行模式：本机（未配置云端）";
+            return;
+        }
+
+        if (state.cloudLoading && state.cloudLeaderboard.length === 0) {
+            cloudStatusEl.textContent = "排行模式：云端连接中...";
+            return;
+        }
+
+        if (state.cloudError && state.cloudLeaderboard.length === 0) {
+            cloudStatusEl.textContent = "排行模式：云端异常，已回退本机";
+            return;
+        }
+
+        if (state.cloudSyncing) {
+            cloudStatusEl.textContent = "排行模式：云端同步中...";
+            return;
+        }
+
+        cloudStatusEl.textContent = "排行模式：云端";
     }
 
     function updateProfilePanel() {
@@ -399,20 +654,44 @@
     function updateLeaderboardPanel() {
         if (!leaderboardListEl) return;
 
-        const ranked = Object.entries(state.profiles.users)
+        const localRanked = Object.entries(state.profiles.users)
             .sort((a, b) => b[1].bestScore - a[1].bestScore || a[0].localeCompare(b[0]))
-            .slice(0, 10);
+            .slice(0, 10)
+            .map(([name, profile]) => ({
+                name,
+                bestScore: parseBestScore(profile && profile.bestScore)
+            }))
+            .filter((it) => it.bestScore > 0);
+
+        let ranked = localRanked;
+        if (state.cloudEnabled && state.cloudLeaderboard.length) {
+            ranked = state.cloudLeaderboard;
+        }
+
+        if (leaderboardTitleEl) {
+            if (!state.cloudEnabled) {
+                leaderboardTitleEl.textContent = "排行榜（本机 Top 10）";
+            } else if (state.cloudLeaderboard.length) {
+                leaderboardTitleEl.textContent = "排行榜（云端 Top 10）";
+            } else if (state.cloudLoading) {
+                leaderboardTitleEl.textContent = "排行榜（云端加载中...）";
+            } else if (state.cloudError) {
+                leaderboardTitleEl.textContent = "排行榜（云端异常，显示本机）";
+            } else {
+                leaderboardTitleEl.textContent = "排行榜（等待云端数据）";
+            }
+        }
 
         if (!ranked.length) {
-            leaderboardListEl.textContent = "暂无排行";
+            leaderboardListEl.textContent = state.cloudEnabled ? "暂无排行（先打一局上传分数）" : "暂无排行";
             return;
         }
 
         leaderboardListEl.innerHTML = "";
-        for (const [name, profile] of ranked) {
+        for (const row of ranked) {
             const li = document.createElement("li");
-            const marker = name === state.activeUser ? " <- 当前" : "";
-            li.textContent = `${name}: ${profile.bestScore}${marker}`;
+            const marker = row.name === state.activeUser ? " <- 当前" : "";
+            li.textContent = `${row.name}: ${row.bestScore}${marker}`;
             leaderboardListEl.appendChild(li);
         }
     }
@@ -2205,6 +2484,15 @@
     updateAudioButton();
     updatePauseButton();
     setProfileDockVisible(false);
+    updateCloudStatus();
+
+    if (state.cloudEnabled) {
+        void pullCloudBestForUser(state.activeUser);
+        void refreshCloudLeaderboard(true);
+        setInterval(() => {
+            void refreshCloudLeaderboard(false);
+        }, CLOUD.refreshMs);
+    }
 
     loadAssets().catch(() => {
         loadingEl.textContent = "素材加载失败，请刷新重试";

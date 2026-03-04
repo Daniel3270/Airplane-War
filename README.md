@@ -6,7 +6,7 @@
 
 1. 进入项目目录 `D:\Code\FLY_game`
 2. 直接用浏览器打开 `index.html`
-3. 点击 `Start Game` 开始
+3. 点击 `开始游戏` 开始
 
 说明：`final_game.html` 与 `index.html` 当前为同一版本入口。
 
@@ -20,7 +20,8 @@
   - 激光强化：限时激活激光武器。
   - 飞弹强化：限时激活追踪飞弹武器。
 - 支持本地多用户：可自定义用户名、切换用户，并记录各自最高分与最近战绩。
-- 内置本机排行榜（Top 10），按用户最高分排序。
+- 支持本机排行榜（Top 10），按用户最高分排序。
+- 支持可选云端排行榜（Supabase，跨设备共享）。
 - 中后期会出现更强的精英敌机（更高血量、弹幕更密集）。
 - 每连续击毁 20 个目标可恢复 1 点生命（不超过上限）。
 - 敌机子弹命中或敌机碰撞都会导致掉血。
@@ -54,6 +55,60 @@
 - 使用 `Canvas 2D` 渲染。
 - 无第三方依赖，打开即玩。
 - 最高分保存在浏览器 `localStorage`（键名：`plane-war-remaster-best-score`）。
+
+## 云端排行榜（Supabase）
+
+默认是本机模式。要开启云端排行榜：
+
+1. 在 Supabase 创建项目。
+2. 执行下面 SQL（新建表 + 允许匿名读写）：
+
+```sql
+create table if not exists public.airplane_scores (
+  username text primary key,
+  best_score integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.airplane_scores enable row level security;
+
+drop policy if exists "read_scores" on public.airplane_scores;
+create policy "read_scores"
+on public.airplane_scores
+for select
+using (true);
+
+drop policy if exists "insert_scores" on public.airplane_scores;
+create policy "insert_scores"
+on public.airplane_scores
+for insert
+with check (true);
+
+drop policy if exists "update_scores" on public.airplane_scores;
+create policy "update_scores"
+on public.airplane_scores
+for update
+using (true)
+with check (true);
+```
+
+3. 编辑 `assets/js/cloud_config.js`，填入你的配置：
+
+```js
+window.CLOUD_CONFIG = {
+  supabaseUrl: "https://YOUR_PROJECT_REF.supabase.co",
+  supabaseAnonKey: "YOUR_ANON_KEY",
+  table: "airplane_scores",
+  autoRefreshMs: 30000
+};
+```
+
+4. 重新打开 `index.html`，在“玩家档案”里会显示 `排行模式：云端`。
+
+说明：
+
+- 云端排行是“用户名 + 最高分”模式，会自动保留更高分。
+- 如果云端不可用，会自动回退到本机排行显示。
 
 ## 素材与版权
 
