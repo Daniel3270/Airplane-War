@@ -1,0 +1,12 @@
+assets/_downloads/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
