@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>飞机大战 - Enhanced Edition</title>
+    <title>椋炴満澶ф垬 - Enhanced Edition</title>
     <style>
         :root {
             --bg-0: #050b1a;
@@ -203,6 +203,84 @@
             justify-content: center;
         }
 
+        .profile-panel {
+            width: min(100%, 360px);
+            margin-top: 6px;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(150, 205, 250, 0.35);
+            background: rgba(8, 18, 35, 0.58);
+            text-align: left;
+        }
+
+        .profile-title,
+        .leaderboard-title {
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            color: #a9c9e4;
+        }
+
+        .profile-row {
+            margin-top: 6px;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .profile-label {
+            color: #b4d1e8;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        #profile-input,
+        #profile-select {
+            width: 100%;
+            border: 1px solid rgba(155, 205, 245, 0.45);
+            border-radius: 8px;
+            padding: 6px 8px;
+            background: rgba(14, 29, 52, 0.88);
+            color: #d7eeff;
+            font-size: 12px;
+            outline: none;
+        }
+
+        #profile-save {
+            border: 1px solid rgba(155, 205, 245, 0.45);
+            border-radius: 8px;
+            padding: 6px 10px;
+            background: rgba(17, 40, 68, 0.95);
+            color: #d7eeff;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        #profile-meta,
+        #profile-history {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #bfd9ee;
+            line-height: 1.35;
+        }
+
+        .leaderboard-title {
+            margin-top: 8px;
+        }
+
+        #leaderboard-list {
+            margin: 5px 0 0 18px;
+            max-height: 92px;
+            overflow: auto;
+            color: #d9ecff;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        #leaderboard-list li {
+            margin-bottom: 2px;
+        }
+
         button.primary {
             border: 0;
             border-radius: 12px;
@@ -303,6 +381,23 @@
             .overlay p {
                 font-size: 14px;
             }
+
+            .profile-panel {
+                width: min(100%, 340px);
+                padding: 8px;
+            }
+
+            .profile-title,
+            .leaderboard-title,
+            .profile-label,
+            #profile-meta,
+            #profile-history,
+            #leaderboard-list,
+            #profile-input,
+            #profile-select,
+            #profile-save {
+                font-size: 11px;
+            }
         }
 
         @media (max-width: 420px) {
@@ -324,17 +419,17 @@
     </style>
 </head>
 <body>
-    <main id="game-shell" aria-label="飞机大战游戏区域">
+    <main id="game-shell" aria-label="椋炴満澶ф垬娓告垙鍖哄煙">
         <canvas id="game-canvas" width="420" height="720"></canvas>
 
         <section id="hud" aria-live="polite">
             <div class="hud-panel">
                 <div class="hud-label">Score</div>
                 <div class="hud-value" id="score">0</div>
-                <div class="hud-small">连击 <span id="combo">0</span></div>
+                <div class="hud-small">杩炲嚮 <span id="combo">0</span></div>
             </div>
             <div class="hud-panel" style="text-align: right;">
-                <div class="hud-label">生命 / 最高分</div>
+                <div class="hud-label">鐢熷懡 / 鏈€楂樺垎</div>
                 <div class="hud-value" id="lives">3</div>
                 <div class="hud-small" id="best">Best 0</div>
                 <div class="hud-small" id="weapon">Weapon NORMAL</div>
@@ -347,30 +442,46 @@
             <button id="pause-toggle" type="button" disabled>PAUSE</button>
         </div>
 
-        <div id="pause-pill">已暂停（P / ESC 继续）</div>
+        <div id="pause-pill">宸叉殏鍋滐紙P / ESC 缁х画锛?/div>
 
         <section id="start-overlay" class="overlay">
-            <h1>飞机大战 · Enhanced</h1>
-            <p>已接入新视觉素材与完整音频：敌机扩展、陨石、爆炸序列、射击/爆炸音效和循环背景音乐。</p>
-            <p>键盘：方向键 / WASD 移动，P 或 ESC 暂停，R 重开，B 清屏炸弹，M 静音，[ / ] 调音量，F 全屏，H 显示/隐藏 HUD。<br>鼠标/触控：按住并拖动飞机。</p>
+            <h1>椋炴満澶ф垬 路 Enhanced</h1>
+            <p>宸叉帴鍏ユ柊瑙嗚绱犳潗涓庡畬鏁撮煶棰戯細鏁屾満鎵╁睍銆侀櫒鐭炽€佺垎鐐稿簭鍒椼€佸皠鍑?鐖嗙偢闊虫晥鍜屽惊鐜儗鏅煶涔愩€?/p>
+            <p>閿洏锛氭柟鍚戦敭 / WASD 绉诲姩锛孭 鎴?ESC 鏆傚仠锛孯 閲嶅紑锛孊 娓呭睆鐐稿脊锛孧 闈欓煶锛孾 / ] 璋冮煶閲忥紝F 鍏ㄥ睆锛孒 鏄剧ず/闅愯棌 HUD銆?br>榧犳爣/瑙︽帶锛氭寜浣忓苟鎷栧姩椋炴満銆?/p>
+            <section class="profile-panel" aria-label="玩家与排行榜">
+                <div class="profile-title">玩家档案（本机）</div>
+                <div class="profile-row">
+                    <input id="profile-input" type="text" maxlength="16" placeholder="输入自定义用户名">
+                    <button id="profile-save" type="button">切换/新建</button>
+                </div>
+                <div class="profile-row">
+                    <span class="profile-label">已有用户</span>
+                    <select id="profile-select"></select>
+                </div>
+                <div id="profile-meta">当前用户: Pilot | Best 0</div>
+                <div id="profile-history">暂无战绩</div>
+                <div class="leaderboard-title">排行榜（Top 10）</div>
+                <ol id="leaderboard-list"></ol>
+            </section>
             <div class="actions">
-                <button id="start-btn" class="primary" disabled>加载素材中...</button>
+                <button id="start-btn" class="primary" disabled>鍔犺浇绱犳潗涓?..</button>
             </div>
-            <p class="hint">游戏自动射击。生存越久，敌机越快且会反击。</p>
+            <p class="hint">娓告垙鑷姩灏勫嚮銆傜敓瀛樿秺涔咃紝鏁屾満瓒婂揩涓斾細鍙嶅嚮銆?/p>
         </section>
 
         <section id="gameover-overlay" class="overlay hidden">
-            <h2>任务失败</h2>
-            <p>本局分数：<strong id="final-score">0</strong></p>
-            <p>最高分：<strong id="final-best">0</strong></p>
+            <h2>浠诲姟澶辫触</h2>
+            <p>鏈眬鍒嗘暟锛?strong id="final-score">0</strong></p>
+            <p>鏈€楂樺垎锛?strong id="final-best">0</strong></p>
             <div class="actions">
-                <button id="restart-btn" class="primary">再来一局</button>
+                <button id="restart-btn" class="primary">鍐嶆潵涓€灞€</button>
             </div>
-            <p class="hint">按 Enter 也可以快速重开</p>
+            <p class="hint">鎸?Enter 涔熷彲浠ュ揩閫熼噸寮€</p>
         </section>
 
-        <div id="loading">正在加载素材...</div>
+        <div id="loading">姝ｅ湪鍔犺浇绱犳潗...</div>
     </main>
     <script src="assets/js/final_game.js"></script>
 </body>
 </html>
+

@@ -19,6 +19,7 @@
         laserTick: 0.065,
         hitInvincibleSeconds: 1.15,
         storageKey: "plane-war-remaster-best-score",
+        profileStorageKey: "plane-war-remaster-profiles-v1",
         bgmVolume: 0.35,
         sfxVolume: 0.65
     };
@@ -98,6 +99,12 @@
     const hudEl = document.getElementById("hud");
     const hudControlsEl = document.getElementById("hud-controls");
     const gameShell = document.getElementById("game-shell");
+    const profileSelectEl = document.getElementById("profile-select");
+    const profileInputEl = document.getElementById("profile-input");
+    const profileSaveBtn = document.getElementById("profile-save");
+    const profileMetaEl = document.getElementById("profile-meta");
+    const profileHistoryEl = document.getElementById("profile-history");
+    const leaderboardListEl = document.getElementById("leaderboard-list");
 
     const images = Object.create(null);
     const sounds = Object.create(null);
@@ -124,7 +131,9 @@
         weaponMode: "normal",
         weaponTimer: 0,
         laserDual: false,
-        bestScore: loadBestScore(),
+        bestScore: 0,
+        profiles: loadProfiles(),
+        activeUser: "",
         stars: createStars(95),
         bullets: [],
         enemyBullets: [],
@@ -146,6 +155,9 @@
         },
         player: createPlayer()
     };
+
+    state.activeUser = state.profiles.activeUser;
+    state.bestScore = getActiveProfile().bestScore;
 
     function createPlayer() {
         return {
@@ -172,13 +184,234 @@
         return stars;
     }
 
-    function loadBestScore() {
+    function loadLegacyBestScore() {
         const raw = Number.parseInt(localStorage.getItem(CONFIG.storageKey) || "0", 10);
         return Number.isFinite(raw) && raw > 0 ? raw : 0;
     }
 
-    function saveBestScore(value) {
-        localStorage.setItem(CONFIG.storageKey, String(value));
+    function normalizeUserName(raw) {
+        return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 16);
+    }
+
+    function loadProfiles() {
+        const legacyBest = loadLegacyBestScore();
+        const fallbackName = "Pilot";
+        const raw = localStorage.getItem(CONFIG.profileStorageKey);
+        if (!raw) {
+            return {
+                activeUser: fallbackName,
+                users: {
+                    [fallbackName]: {
+                        bestScore: legacyBest,
+                        records: []
+                    }
+                }
+            };
+        }
+
+        try {
+            const parsed = JSON.parse(raw);
+            return sanitizeProfiles(parsed, legacyBest, fallbackName);
+        } catch (_err) {
+            return {
+                activeUser: fallbackName,
+                users: {
+                    [fallbackName]: {
+                        bestScore: legacyBest,
+                        records: []
+                    }
+                }
+            };
+        }
+    }
+
+    function sanitizeProfiles(source, legacyBest, fallbackName) {
+        const users = Object.create(null);
+        if (source && typeof source.users === "object" && source.users) {
+            for (const [rawName, rawProfile] of Object.entries(source.users)) {
+                const name = normalizeUserName(rawName);
+                if (!name) continue;
+
+                const bestRaw = Number(rawProfile && rawProfile.bestScore);
+                const bestScore = Number.isFinite(bestRaw) && bestRaw > 0 ? Math.floor(bestRaw) : 0;
+                const records = Array.isArray(rawProfile && rawProfile.records)
+                    ? rawProfile.records
+                        .map((it) => {
+                            const score = Number(it && it.score);
+                            const ts = Number(it && it.ts);
+                            return {
+                                score: Number.isFinite(score) && score > 0 ? Math.floor(score) : 0,
+                                ts: Number.isFinite(ts) && ts > 0 ? Math.floor(ts) : Date.now()
+                            };
+                        })
+                        .filter((it) => it.score > 0)
+                        .slice(0, 20)
+                    : [];
+
+                users[name] = { bestScore, records };
+            }
+        }
+
+        const names = Object.keys(users);
+        if (names.length === 0) {
+            users[fallbackName] = { bestScore: legacyBest, records: [] };
+        } else if (legacyBest > 0) {
+            let merged = false;
+            for (const name of names) {
+                if (users[name].bestScore >= legacyBest) {
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) {
+                if (!users[fallbackName]) {
+                    users[fallbackName] = { bestScore: legacyBest, records: [] };
+                } else {
+                    users[fallbackName].bestScore = Math.max(users[fallbackName].bestScore, legacyBest);
+                }
+            }
+        }
+
+        let activeUser = normalizeUserName(source && source.activeUser);
+        if (!activeUser || !users[activeUser]) {
+            activeUser = Object.keys(users)[0];
+        }
+
+        return { activeUser, users };
+    }
+
+    function saveProfiles() {
+        if (!state.profiles) return;
+        localStorage.setItem(
+            CONFIG.profileStorageKey,
+            JSON.stringify({
+                activeUser: state.activeUser,
+                users: state.profiles.users
+            })
+        );
+    }
+
+    function ensureUser(name) {
+        const safeName = normalizeUserName(name);
+        if (!safeName) return "";
+        if (!state.profiles.users[safeName]) {
+            state.profiles.users[safeName] = {
+                bestScore: 0,
+                records: []
+            };
+        }
+        return safeName;
+    }
+
+    function getActiveProfile() {
+        const active = ensureUser(state.activeUser || "Pilot");
+        if (!active) {
+            state.activeUser = "Pilot";
+            ensureUser(state.activeUser);
+            return state.profiles.users[state.activeUser];
+        }
+
+        state.activeUser = active;
+        return state.profiles.users[state.activeUser];
+    }
+
+    function setActiveUser(name) {
+        const safeName = ensureUser(name);
+        if (!safeName) return;
+        state.activeUser = safeName;
+        state.profiles.activeUser = safeName;
+        state.bestScore = getActiveProfile().bestScore;
+        saveProfiles();
+        updateProfilePanel();
+        updateLeaderboardPanel();
+        updateHud();
+    }
+
+    function pushProfileRecord(score) {
+        const profile = getActiveProfile();
+        if (score > 0) {
+            profile.records.unshift({
+                score,
+                ts: Date.now()
+            });
+            if (profile.records.length > 20) {
+                profile.records.length = 20;
+            }
+        }
+
+        if (score > profile.bestScore) {
+            profile.bestScore = score;
+        }
+
+        state.bestScore = profile.bestScore;
+        state.profiles.activeUser = state.activeUser;
+        saveProfiles();
+        updateProfilePanel();
+        updateLeaderboardPanel();
+    }
+
+    function formatRecordTime(ts) {
+        const d = new Date(ts);
+        if (!Number.isFinite(d.getTime())) return "--";
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mi = String(d.getMinutes()).padStart(2, "0");
+        return `${mm}-${dd} ${hh}:${mi}`;
+    }
+
+    function updateProfilePanel() {
+        if (!profileSelectEl) return;
+
+        const users = Object.entries(state.profiles.users)
+            .sort((a, b) => b[1].bestScore - a[1].bestScore || a[0].localeCompare(b[0]));
+
+        const current = state.activeUser || users[0][0];
+        profileSelectEl.innerHTML = "";
+        for (const [name] of users) {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            if (name === current) opt.selected = true;
+            profileSelectEl.appendChild(opt);
+        }
+
+        const profile = getActiveProfile();
+        if (profileMetaEl) {
+            profileMetaEl.textContent = `当前用户: ${state.activeUser} | Best ${profile.bestScore}`;
+        }
+
+        if (profileHistoryEl) {
+            if (!profile.records.length) {
+                profileHistoryEl.textContent = "暂无战绩";
+            } else {
+                const rows = profile.records
+                    .slice(0, 5)
+                    .map((r) => `${r.score}  (${formatRecordTime(r.ts)})`);
+                profileHistoryEl.textContent = rows.join(" | ");
+            }
+        }
+    }
+
+    function updateLeaderboardPanel() {
+        if (!leaderboardListEl) return;
+
+        const ranked = Object.entries(state.profiles.users)
+            .sort((a, b) => b[1].bestScore - a[1].bestScore || a[0].localeCompare(b[0]))
+            .slice(0, 10);
+
+        if (!ranked.length) {
+            leaderboardListEl.textContent = "暂无排行";
+            return;
+        }
+
+        leaderboardListEl.innerHTML = "";
+        for (const [name, profile] of ranked) {
+            const li = document.createElement("li");
+            const marker = name === state.activeUser ? " <- 当前" : "";
+            li.textContent = `${name}: ${profile.bestScore}${marker}`;
+            leaderboardListEl.appendChild(li);
+        }
     }
 
     function updateAudioButton() {
@@ -369,10 +602,7 @@
         pausePill.style.display = "none";
         stopBgm();
 
-        if (state.score > state.bestScore) {
-            state.bestScore = state.score;
-            saveBestScore(state.bestScore);
-        }
+        pushProfileRecord(state.score);
 
         finalScoreEl.textContent = String(state.score);
         finalBestEl.textContent = String(state.bestScore);
@@ -1877,6 +2107,40 @@
         startGame();
     });
 
+    function commitProfileInput() {
+        if (!profileInputEl) return;
+        const name = normalizeUserName(profileInputEl.value);
+        if (!name) return;
+        setActiveUser(name);
+        profileInputEl.value = "";
+    }
+
+    if (profileSaveBtn) {
+        profileSaveBtn.addEventListener("click", () => {
+            if (state.running) return;
+            commitProfileInput();
+        });
+    }
+
+    if (profileInputEl) {
+        profileInputEl.addEventListener("keydown", (event) => {
+            if (event.code !== "Enter") return;
+            event.preventDefault();
+            if (state.running) return;
+            commitProfileInput();
+        });
+    }
+
+    if (profileSelectEl) {
+        profileSelectEl.addEventListener("change", () => {
+            if (state.running) {
+                profileSelectEl.value = state.activeUser;
+                return;
+            }
+            setActiveUser(profileSelectEl.value);
+        });
+    }
+
     if (audioToggleBtn) {
         audioToggleBtn.addEventListener("click", () => {
             toggleMute();
@@ -1889,6 +2153,8 @@
         });
     }
 
+    updateProfilePanel();
+    updateLeaderboardPanel();
     updateHud();
     updateAudioButton();
     updatePauseButton();
