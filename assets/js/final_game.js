@@ -105,6 +105,8 @@
     const profileMetaEl = document.getElementById("profile-meta");
     const profileHistoryEl = document.getElementById("profile-history");
     const leaderboardListEl = document.getElementById("leaderboard-list");
+    const profileOpenBtn = document.getElementById("profile-open");
+    const profileDockEl = document.getElementById("profile-dock");
 
     const images = Object.create(null);
     const sounds = Object.create(null);
@@ -433,6 +435,15 @@
         pauseToggleBtn.textContent = state.paused ? "RESUME" : "PAUSE";
     }
 
+    function setProfileDockVisible(visible) {
+        if (!profileDockEl) return;
+        if (visible) {
+            profileDockEl.classList.add("visible");
+        } else {
+            profileDockEl.classList.remove("visible");
+        }
+    }
+
     function setBgmVolume() {
         const bgm = sounds.bgm;
         if (!bgm) return;
@@ -581,6 +592,7 @@
         startOverlay.classList.add("hidden");
         gameoverOverlay.classList.add("hidden");
         pausePill.style.display = "none";
+        setProfileDockVisible(false);
         updateHud();
         updatePauseButton();
 
@@ -608,6 +620,7 @@
         finalBestEl.textContent = String(state.bestScore);
         updateHud();
         updatePauseButton();
+        setProfileDockVisible(true);
         gameoverOverlay.classList.remove("hidden");
     }
 
@@ -1952,6 +1965,9 @@
         if (!state.running) return;
         state.paused = !state.paused;
         pausePill.style.display = state.paused ? "block" : "none";
+        if (!state.paused) {
+            setProfileDockVisible(false);
+        }
         updatePauseButton();
         if (state.paused) {
             stopBgm();
@@ -2117,7 +2133,7 @@
 
     if (profileSaveBtn) {
         profileSaveBtn.addEventListener("click", () => {
-            if (state.running) return;
+            if (state.running && !state.paused) return;
             commitProfileInput();
         });
     }
@@ -2126,18 +2142,32 @@
         profileInputEl.addEventListener("keydown", (event) => {
             if (event.code !== "Enter") return;
             event.preventDefault();
-            if (state.running) return;
+            if (state.running && !state.paused) return;
             commitProfileInput();
         });
     }
 
     if (profileSelectEl) {
         profileSelectEl.addEventListener("change", () => {
-            if (state.running) {
+            if (state.running && !state.paused) {
                 profileSelectEl.value = state.activeUser;
                 return;
             }
             setActiveUser(profileSelectEl.value);
+        });
+    }
+
+    if (profileOpenBtn) {
+        profileOpenBtn.addEventListener("click", () => {
+            const opening = !(profileDockEl && profileDockEl.classList.contains("visible"));
+            if (opening && state.running && !state.paused) {
+                togglePause();
+            }
+            setProfileDockVisible(opening);
+            if (opening) {
+                updateProfilePanel();
+                updateLeaderboardPanel();
+            }
         });
     }
 
@@ -2158,6 +2188,7 @@
     updateHud();
     updateAudioButton();
     updatePauseButton();
+    setProfileDockVisible(true);
 
     loadAssets().catch(() => {
         loadingEl.textContent = "素材加载失败，请刷新重试";
