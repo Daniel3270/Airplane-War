@@ -1082,7 +1082,6 @@
 
             if (enemy.y - enemy.h / 2 > CONFIG.height + 8) {
                 state.enemies.splice(i, 1);
-                onPlayerHit(enemy.contactDamage || 1);
             }
         }
     }
