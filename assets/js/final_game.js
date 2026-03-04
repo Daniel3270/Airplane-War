@@ -16,7 +16,7 @@
         pickupMinInterval: 5.0,
         pickupRampPerSecond: 0.01,
         weaponDuration: 12,
-        laserTick: 0.09,
+        laserTick: 0.065,
         hitInvincibleSeconds: 1.15,
         storageKey: "plane-war-remaster-best-score",
         bgmVolume: 0.35,
@@ -513,7 +513,11 @@
             const hitWidth = beamHalfWidth + enemy.w * (enemy.type === "meteor" ? 0.28 : 0.4);
             if (Math.abs(enemy.x - state.player.x) > hitWidth) continue;
 
-            const damage = enemy.kind === "destroyer" ? 1.15 : 1.9;
+            let damage = 2.35;
+            if (enemy.type === "meteor") damage = 2.05;
+            if (enemy.kind === "elite") damage = 2.5;
+            if (enemy.kind === "ace") damage = 2.65;
+            if (enemy.kind === "destroyer") damage = 1.75;
             enemy.hp -= damage;
             touched = true;
             if (enemy.hp <= 0) {
@@ -723,7 +727,7 @@
     }
 
     function spawnEnemyFromLibrary() {
-        const diff = 1 + state.elapsed * 0.028 + state.score * 0.00016;
+        const diff = Math.min(1.82, 1 + state.elapsed * 0.017 + state.score * 0.00009);
         const roll = Math.random();
         let template;
 
@@ -732,8 +736,8 @@
                 image: "enemyRed",
                 hp: 1,
                 score: 110,
-                speedMin: 150,
-                speedMax: 230,
+                speedMin: 135,
+                speedMax: 205,
                 scale: 0.56,
                 drift: 90,
                 shootChance: 0.18,
@@ -745,8 +749,8 @@
                 image: "enemyGreen",
                 hp: 2,
                 score: 185,
-                speedMin: 130,
-                speedMax: 195,
+                speedMin: 118,
+                speedMax: 178,
                 scale: 0.62,
                 drift: 76,
                 shootChance: 0.26,
@@ -758,8 +762,8 @@
                 image: "enemyScout1",
                 hp: 2,
                 score: 195,
-                speedMin: 130,
-                speedMax: 210,
+                speedMin: 116,
+                speedMax: 186,
                 scale: 0.64,
                 drift: 95,
                 shootChance: 0.32,
@@ -771,8 +775,8 @@
                 image: "enemyScout2",
                 hp: 2,
                 score: 215,
-                speedMin: 140,
-                speedMax: 220,
+                speedMin: 124,
+                speedMax: 194,
                 scale: 0.64,
                 drift: 98,
                 shootChance: 0.38,
@@ -784,8 +788,8 @@
                 image: "enemyBlack",
                 hp: 3,
                 score: 265,
-                speedMin: 110,
-                speedMax: 165,
+                speedMin: 100,
+                speedMax: 148,
                 scale: 0.71,
                 drift: 58,
                 shootChance: 0.32,
@@ -797,8 +801,8 @@
                 image: "enemyElite",
                 hp: 5,
                 score: 420,
-                speedMin: 95,
-                speedMax: 150,
+                speedMin: 88,
+                speedMax: 136,
                 scale: 0.58,
                 drift: 42,
                 shootChance: 0.6,
@@ -817,8 +821,8 @@
                 image: "enemyDestroyer",
                 hp: 14,
                 score: 980,
-                speedMin: 92,
-                speedMax: 142,
+                speedMin: 84,
+                speedMax: 130,
                 scale: 0.52,
                 drift: 74,
                 shootChance: 0.92,
@@ -835,8 +839,8 @@
                 image: "enemyAce",
                 hp: 8,
                 score: 620,
-                speedMin: 122,
-                speedMax: 188,
+                speedMin: 110,
+                speedMax: 168,
                 scale: 0.74,
                 drift: 118,
                 shootChance: 0.78,
@@ -886,10 +890,10 @@
     }
 
     function spawnMeteor() {
-        const diff = 1 + state.elapsed * 0.02 + state.score * 0.00012;
+        const diff = Math.min(1.65, 1 + state.elapsed * 0.012 + state.score * 0.00007);
         const template = Math.random() < 0.5
-            ? { image: "meteor1", hp: 3, score: 240, speedMin: 95, speedMax: 165, scale: 0.24 }
-            : { image: "meteor2", hp: 4, score: 300, speedMin: 90, speedMax: 150, scale: 0.24 };
+            ? { image: "meteor1", hp: 3, score: 240, speedMin: 84, speedMax: 145, scale: 0.24 }
+            : { image: "meteor2", hp: 4, score: 300, speedMin: 80, speedMax: 132, scale: 0.24 };
 
         const source = images[template.image];
         const baseW = source && source.naturalWidth ? source.naturalWidth : 210;
