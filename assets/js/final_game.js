@@ -639,10 +639,10 @@
             state.fireTimer = 0.24 * fireRatio;
             const dualFire = state.keys.Space || state.elapsed > 52 || state.score > 8200;
             const offsets = dualFire ? [-12, 12] : [0];
-            const turnRate = 7.9 + Math.min(10.8, state.elapsed * 0.06 + state.score * 0.0003);
-            const maxSpeed = 620 + Math.min(360, state.elapsed * 2.3 + state.score * 0.028);
-            const accel = 640 + Math.min(560, state.elapsed * 5.6 + state.score * 0.02);
-            const startSpeed = Math.min(maxSpeed * 0.72, 470 + state.elapsed * 1.7);
+            const turnRate = 9.6 + Math.min(13.5, state.elapsed * 0.08 + state.score * 0.00034);
+            const maxSpeed = 820 + Math.min(520, state.elapsed * 3.2 + state.score * 0.038);
+            const accel = 980 + Math.min(780, state.elapsed * 7.2 + state.score * 0.028);
+            const startSpeed = Math.min(maxSpeed * 0.82, 620 + state.elapsed * 2.7);
             const baseDamage = 2.6 + Math.min(1.8, state.elapsed * 0.01 + state.score * 0.00012);
 
             for (const offset of offsets) {
@@ -659,8 +659,8 @@
                     accel,
                     turnRate,
                     damage: baseDamage,
-                    proximity: 24,
-                    life: 3.4,
+                    proximity: 28,
+                    life: 3.8,
                     rotation: 0,
                     trailTimer: 0
                 });
@@ -932,7 +932,7 @@
                     const dx = target.x - bullet.x;
                     const dy = target.y - bullet.y;
                     const dist = Math.hypot(dx, dy) || 1;
-                    const travelTime = clamp(dist / Math.max(220, bullet.speed || 1), 0.06, 0.46);
+                    const travelTime = clamp(dist / Math.max(280, bullet.speed || 1), 0.05, 0.4);
 
                     const aimX = target.x + velocity.vx * travelTime;
                     const aimY = target.y + velocity.vy * travelTime;
@@ -954,7 +954,7 @@
                 } else {
                     bullet.speed = Math.min(
                         bullet.maxSpeed || bullet.speed,
-                        bullet.speed + (bullet.accel || 0) * dt * 0.55
+                        bullet.speed + (bullet.accel || 0) * dt * 0.9
                     );
                     const angle = Math.atan2(bullet.vy, bullet.vx);
                     bullet.vx = Math.cos(angle) * bullet.speed;
