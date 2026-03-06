@@ -189,6 +189,7 @@
             y: CONFIG.height - 110,
             w: 62,
             h: 48,
+            hitRadius: 10,
             spread: 1,
             invincible: 0
         };
@@ -1303,6 +1304,7 @@
         const timeFactor = Math.min(1, state.elapsed / 480);
         const scoreFactor = Math.min(1, state.score / 42000);
         const diff = 1 + timeFactor * 0.44 + scoreFactor * 0.2;
+        const hpScale = 1 + timeFactor * 0.55 + scoreFactor * 0.22;
         const roll = Math.random();
         let template;
 
@@ -1443,8 +1445,8 @@
             y: -h / 2 - 12,
             w,
             h,
-            hp: template.hp,
-            maxHp: template.hp,
+            hp: Math.max(template.hp, Math.round(template.hp * hpScale)),
+            maxHp: Math.max(template.hp, Math.round(template.hp * hpScale)),
             kind: template.kind || "enemy",
             score: template.score,
             vy: randomRange(template.speedMin, template.speedMax) * diff,
@@ -1468,6 +1470,7 @@
         const timeFactor = Math.min(1, state.elapsed / 520);
         const scoreFactor = Math.min(1, state.score / 50000);
         const diff = 1 + timeFactor * 0.34 + scoreFactor * 0.16;
+        const hpScale = 1 + timeFactor * 0.42 + scoreFactor * 0.18;
         const template = Math.random() < 0.5
             ? { image: "meteor1", hp: 3, score: 240, speedMin: 84, speedMax: 145, scale: 0.24 }
             : { image: "meteor2", hp: 4, score: 300, speedMin: 80, speedMax: 132, scale: 0.24 };
@@ -1486,8 +1489,8 @@
             y: -h / 2 - 14,
             w,
             h,
-            hp: template.hp,
-            maxHp: template.hp,
+            hp: Math.max(template.hp, Math.round(template.hp * hpScale)),
+            maxHp: Math.max(template.hp, Math.round(template.hp * hpScale)),
             score: template.score,
             vy: randomRange(template.speedMin, template.speedMax) * diff,
             drift: randomRange(12, 35) * (Math.random() > 0.5 ? 1 : -1),
@@ -1774,10 +1777,11 @@
             }
         }
 
+        const playerHitRadius = state.player.hitRadius || 10;
         if (state.player.invincible <= 0) {
             for (let i = state.enemyBullets.length - 1; i >= 0; i -= 1) {
                 const bullet = state.enemyBullets[i];
-                if (!intersects(state.player, bullet, 0.7)) {
+                if (!circleIntersectsRect(state.player.x, state.player.y, playerHitRadius, bullet, 0.58)) {
                     continue;
                 }
                 state.enemyBullets.splice(i, 1);
@@ -1789,7 +1793,7 @@
         if (state.player.invincible <= 0) {
             for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
                 const enemy = state.enemies[i];
-                if (!intersects(state.player, enemy, 0.75)) {
+                if (!circleIntersectsRect(state.player.x, state.player.y, playerHitRadius + 4, enemy, 0.52)) {
                     continue;
                 }
 
@@ -2011,6 +2015,18 @@
             ctx.stroke();
             ctx.restore();
         }
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = "rgba(210, 246, 255, 0.95)";
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, Math.max(3, (player.hitRadius || 10) * 0.32), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(104, 214, 255, 0.28)";
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, Math.max(6, (player.hitRadius || 10) * 0.9), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     function drawThruster(player) {
@@ -2262,6 +2278,23 @@
             Math.abs(a.x - b.x) < aHalfW + bHalfW &&
             Math.abs(a.y - b.y) < aHalfH + bHalfH
         );
+    }
+
+    function clampRectPoint(px, py, rect, shrink) {
+        const sx = (shrink || 1) * 0.5;
+        const halfW = (rect.w || 0) * sx;
+        const halfH = (rect.h || 0) * sx;
+        return {
+            x: clamp(px, rect.x - halfW, rect.x + halfW),
+            y: clamp(py, rect.y - halfH, rect.y + halfH)
+        };
+    }
+
+    function circleIntersectsRect(cx, cy, radius, rect, shrink) {
+        const nearest = clampRectPoint(cx, cy, rect, shrink);
+        const dx = cx - nearest.x;
+        const dy = cy - nearest.y;
+        return dx * dx + dy * dy <= radius * radius;
     }
 
     function clamp(value, min, max) {
