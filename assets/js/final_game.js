@@ -15,6 +15,7 @@
         pickupBaseInterval: 9.2,
         pickupMinInterval: 5.0,
         pickupRampPerSecond: 0.01,
+        bombCooldownSeconds: 8,
         weaponDuration: 12,
         laserTick: 0.065,
         hitInvincibleSeconds: 1.15,
@@ -98,6 +99,9 @@
     const pauseToggleBtn = document.getElementById("pause-toggle");
     const hudEl = document.getElementById("hud");
     const hudControlsEl = document.getElementById("hud-controls");
+    const bombControlEl = document.getElementById("bomb-control");
+    const bombToggleBtn = document.getElementById("bomb-toggle");
+    const bombCdEl = document.getElementById("bomb-cd");
     const gameShell = document.getElementById("game-shell");
     const profileSelectEl = document.getElementById("profile-select");
     const profileInputEl = document.getElementById("profile-input");
@@ -708,11 +712,33 @@
         if (!state.running) {
             pauseToggleBtn.textContent = "PAUSE";
             pauseToggleBtn.disabled = true;
+            updateBombButton();
             return;
         }
 
         pauseToggleBtn.disabled = false;
         pauseToggleBtn.textContent = state.paused ? "RESUME" : "PAUSE";
+        updateBombButton();
+    }
+
+    function updateBombButton() {
+        if (!bombControlEl || !bombToggleBtn) return;
+
+        const shouldShow = state.running && state.hudVisible;
+        bombControlEl.style.display = shouldShow ? "block" : "none";
+        if (!shouldShow) {
+            return;
+        }
+
+        const cooldown = Math.max(0, state.bombCooldown);
+        const ratio = clamp(1 - cooldown / CONFIG.bombCooldownSeconds, 0, 1);
+        bombToggleBtn.style.setProperty("--bomb-ratio", String(ratio));
+
+        const ready = cooldown <= 0.05;
+        bombToggleBtn.disabled = state.paused || !ready;
+        if (bombCdEl) {
+            bombCdEl.textContent = ready ? "READY" : `${cooldown.toFixed(1)}s`;
+        }
     }
 
     function setProfileDockVisible(visible) {
@@ -2222,6 +2248,8 @@
                 weaponTimerEl.textContent = `Mode ${state.weaponTimer.toFixed(1)}s`;
             }
         }
+
+        updateBombButton();
     }
 
     function intersects(a, b, shrink) {
@@ -2263,7 +2291,8 @@
         if (!state.running || state.paused) return;
         if (state.bombCooldown > 0) return;
         if (!detonateSmartBomb()) return;
-        state.bombCooldown = 8;
+        state.bombCooldown = CONFIG.bombCooldownSeconds;
+        updateBombButton();
     }
 
     function toggleHud() {
@@ -2273,6 +2302,7 @@
         if (hudControlsEl) {
             hudControlsEl.style.display = state.hudVisible ? "flex" : "none";
         }
+        updateBombButton();
     }
 
     function toggleFullscreen() {
@@ -2463,6 +2493,18 @@
                 updateProfilePanel();
                 updateLeaderboardPanel();
             }
+        });
+    }
+
+    if (bombToggleBtn) {
+        bombToggleBtn.addEventListener("pointerdown", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
+        bombToggleBtn.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            triggerBomb();
         });
     }
 

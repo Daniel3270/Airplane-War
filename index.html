@@ -151,8 +151,66 @@
             z-index: 22;
         }
 
+        #bomb-control {
+            position: absolute;
+            left: 50%;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+            transform: translateX(-50%);
+            z-index: 23;
+            display: none;
+            pointer-events: auto;
+        }
+
+        #bomb-toggle {
+            --bomb-ratio: 1;
+            position: relative;
+            width: 84px;
+            height: 84px;
+            border: 1px solid rgba(165, 220, 255, 0.76);
+            border-radius: 999px;
+            background: radial-gradient(circle at 35% 24%, rgba(102, 210, 255, 0.34), rgba(13, 30, 54, 0.94) 58%);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+            color: #dcf3ff;
+            cursor: pointer;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+            touch-action: manipulation;
+        }
+
+        #bomb-toggle::before {
+            content: "";
+            position: absolute;
+            inset: -4px;
+            border-radius: 999px;
+            background: conic-gradient(#70e3ff calc(var(--bomb-ratio) * 1turn), rgba(116, 164, 200, 0.26) 0);
+            -webkit-mask: radial-gradient(circle, transparent calc(100% - 7px), #000 calc(100% - 7px));
+            mask: radial-gradient(circle, transparent calc(100% - 7px), #000 calc(100% - 7px));
+            pointer-events: none;
+        }
+
+        #bomb-toggle .bomb-title {
+            position: relative;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0.05em;
+        }
+
+        #bomb-toggle .bomb-cd {
+            position: relative;
+            margin-top: 1px;
+            color: #a8cae4;
+            font-size: 11px;
+            line-height: 1;
+        }
+
         #audio-toggle:disabled,
-        #pause-toggle:disabled {
+        #pause-toggle:disabled,
+        #bomb-toggle:disabled {
             opacity: 0.55;
             cursor: not-allowed;
         }
@@ -451,6 +509,15 @@
                 bottom: 6px;
             }
 
+            #bomb-control {
+                bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+            }
+
+            #bomb-toggle {
+                width: 82px;
+                height: 82px;
+            }
+
             #profile-dock {
                 top: 56px;
                 width: min(94%, 340px);
@@ -506,6 +573,19 @@
                 font-size: 9px;
             }
 
+            #bomb-toggle {
+                width: 74px;
+                height: 74px;
+            }
+
+            #bomb-toggle .bomb-title {
+                font-size: 13px;
+            }
+
+            #bomb-toggle .bomb-cd {
+                font-size: 10px;
+            }
+
             button.ghost,
             button.primary {
                 font-size: 13px;
@@ -537,6 +617,13 @@
             <button id="audio-toggle" type="button">SOUND: ON</button>
             <button id="pause-toggle" type="button" disabled>PAUSE</button>
             <button id="profile-open" type="button">用户</button>
+        </div>
+
+        <div id="bomb-control" aria-label="炸弹控制">
+            <button id="bomb-toggle" type="button" aria-label="使用清屏炸弹">
+                <span class="bomb-title">炸弹</span>
+                <span class="bomb-cd" id="bomb-cd">READY</span>
+            </button>
         </div>
 
         <section id="profile-dock" class="profile-panel" aria-label="玩家与排行榜">
