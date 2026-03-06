@@ -724,7 +724,7 @@
     function updateBombButton() {
         if (!bombControlEl || !bombToggleBtn) return;
 
-        const shouldShow = state.running && state.hudVisible;
+        const shouldShow = state.running && state.hudVisible && !state.paused;
         bombControlEl.style.display = shouldShow ? "block" : "none";
         if (!shouldShow) {
             return;

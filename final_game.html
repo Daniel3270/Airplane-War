@@ -592,6 +592,43 @@
                 padding: 10px 14px;
             }
         }
+
+        @media (orientation: landscape) and (max-height: 460px) {
+            #hud-controls {
+                left: 90px;
+                right: 6px;
+                bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+                justify-content: flex-end;
+            }
+
+            #audio-toggle,
+            #pause-toggle,
+            #profile-open {
+                flex: 1 1 0;
+                min-width: 0;
+                padding: 4px 6px;
+                font-size: 9px;
+            }
+
+            #bomb-control {
+                left: 8px;
+                bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+                transform: none;
+            }
+
+            #bomb-toggle {
+                width: 68px;
+                height: 68px;
+            }
+
+            #bomb-toggle .bomb-title {
+                font-size: 13px;
+            }
+
+            #bomb-toggle .bomb-cd {
+                font-size: 10px;
+            }
+        }
     </style>
 </head>
 <body>
