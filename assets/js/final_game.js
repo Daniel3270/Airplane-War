@@ -96,6 +96,7 @@
     const pausePill = document.getElementById("pause-pill");
     const loadingEl = document.getElementById("loading");
     const audioToggleBtn = document.getElementById("audio-toggle");
+    const audioControlEl = document.getElementById("audio-control");
     const pauseToggleBtn = document.getElementById("pause-toggle");
     const hudEl = document.getElementById("hud");
     const hudControlsEl = document.getElementById("hud-controls");
@@ -2332,6 +2333,9 @@
         if (!hudEl) return;
         state.hudVisible = !state.hudVisible;
         hudEl.style.display = state.hudVisible ? "flex" : "none";
+        if (audioControlEl) {
+            audioControlEl.style.display = state.hudVisible ? "block" : "none";
+        }
         if (hudControlsEl) {
             hudControlsEl.style.display = state.hudVisible ? "flex" : "none";
         }

@@ -121,6 +121,10 @@
             pointer-events: auto;
         }
 
+        #audio-toggle {
+            min-width: 118px;
+        }
+
         .hud-actions {
             display: flex;
             gap: 5px;
@@ -149,6 +153,14 @@
             right: 6px;
             bottom: 8px;
             z-index: 22;
+        }
+
+        #audio-control {
+            position: absolute;
+            right: 6px;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 54px);
+            z-index: 22;
+            pointer-events: auto;
         }
 
         #bomb-control {
@@ -509,6 +521,11 @@
                 bottom: 6px;
             }
 
+            #audio-control {
+                right: 4px;
+                bottom: calc(env(safe-area-inset-bottom, 0px) + 48px);
+            }
+
             #bomb-control {
                 bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
             }
@@ -595,26 +612,30 @@
 
         @media (orientation: landscape) and (max-height: 460px) {
             #hud-controls {
-                left: 96px;
+                left: auto;
                 right: 6px;
                 bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
-                display: grid;
-                grid-template-columns: repeat(2, minmax(72px, 1fr));
+                display: flex;
                 gap: 4px;
-                align-items: end;
             }
 
-            #audio-toggle,
             #pause-toggle,
             #profile-open {
-                width: 100%;
+                width: auto;
                 min-width: 72px;
                 padding: 4px 6px;
                 font-size: 9px;
             }
 
+            #audio-control {
+                right: 6px;
+                bottom: calc(env(safe-area-inset-bottom, 0px) + 42px);
+            }
+
             #audio-toggle {
-                grid-column: 1 / -1;
+                min-width: 112px;
+                padding: 4px 6px;
+                font-size: 9px;
             }
 
             #bomb-control {
@@ -657,8 +678,11 @@
             </div>
         </section>
 
-        <div id="hud-controls" class="hud-actions">
+        <div id="audio-control">
             <button id="audio-toggle" type="button">SOUND: ON</button>
+        </div>
+
+        <div id="hud-controls" class="hud-actions">
             <button id="pause-toggle" type="button" disabled>PAUSE</button>
             <button id="profile-open" type="button">用户</button>
         </div>
